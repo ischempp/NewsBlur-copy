@@ -30,8 +30,10 @@ class PushSubscriptionManager(models.Manager):
         if lease_seconds is None:
             lease_seconds = getattr(settings, 'PUBSUBHUBBUB_LEASE_SECONDS',
                                    DEFAULT_LEASE_SECONDS)
+        
         feed = Feed.get_by_id(feed.id)
         subscription, created = self.get_or_create(feed=feed)
+
         signals.pre_subscribe.send(sender=subscription, created=created)
         subscription.set_expiration(lease_seconds)
         if len(topic) < 200:
@@ -74,7 +76,7 @@ class PushSubscriptionManager(models.Manager):
                     subscription = self.subscribe(extracted_topic.group(1), 
                                                   feed=feed, hub=hub, force_retry=True)
             else:
-                logging.debug(u'   ---> [%-30s] ~FR~BKFeed failed to subscribe to push: %s (code: %s)' % (
+                logging.debug('   ---> [%-30s] ~FR~BKFeed failed to subscribe to push: %s (code: %s)' % (
                               subscription.feed.log_title[:30], error[:100], response and response.status_code))
 
         subscription.save()
@@ -153,7 +155,7 @@ class PushSubscription(models.Model):
                 needs_update = True
 
             if needs_update:
-                logging.debug(u'   ---> [%-30s] ~FR~BKUpdating PuSH hub/topic: %s / %s' % (
+                logging.debug('   ---> [%-30s] ~FR~BKUpdating PuSH hub/topic: %s / %s' % (
                               self.feed, hub_url, self_url))
                 expiration_time = self.lease_expires - datetime.now()
                 seconds = expiration_time.days*86400 + expiration_time.seconds
@@ -162,14 +164,14 @@ class PushSubscription(models.Model):
                         self_url, feed=self.feed, hub=hub_url,
                         lease_seconds=seconds)
                 except TimeoutError:
-                    logging.debug(u'   ---> [%-30s] ~FR~BKTimed out updating PuSH hub/topic: %s / %s' % (
+                    logging.debug('   ---> [%-30s] ~FR~BKTimed out updating PuSH hub/topic: %s / %s' % (
                                   self.feed, hub_url, self_url))
                     
                     
     def __str__(self):
         if self.verified:
-            verified = u'verified'
+            verified = 'verified'
         else:
-            verified = u'unverified'
-        return u'to %s on %s: %s' % (
+            verified = 'unverified'
+        return 'to %s on %s: %s' % (
             self.topic, self.hub, verified)
