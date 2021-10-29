@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
+newsblur := $(shell docker ps -qf "name=newsblur_web")
 
 .PHONY: node
 
@@ -22,7 +23,6 @@ rebuild:
 nb: pull
 	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose down
 	- [[ -d config/certificates ]] && echo "keys exist" || make keys
-	- cd node && npm install & cd ..
 	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose up -d --build --remove-orphans
 	- RUNWITHMAKEBUILD=True docker-compose exec newsblur_web ./manage.py migrate
 	- RUNWITHMAKEBUILD=True docker-compose exec newsblur_web ./manage.py loaddata config/fixtures/bootstrap.json
@@ -35,8 +35,7 @@ bash:
 	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose exec newsblur_web bash
 # allows user to exec into newsblur_web and use pdb.
 debug:
-	- newsblur := $(shell docker ps -qf "name=newsblur_web")
-	- CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker attach ${newsblur}
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker attach ${newsblur}
 log:
 	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20 newsblur_web newsblur_node
 containerkill:
@@ -49,13 +48,18 @@ ps:
 	- RUNWITHMAKEBUILD=True docker-compose ps
 
 	
+logweb: log
+logcelery:
+	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20 task_celery
+logtask: logcelery
 logmongo:
 	- RUNWITHMAKEBUILD=True docker-compose logs -f db_mongo
-alllogs:
+alllogs: 
 	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20
+logall: alllogs
 # brings down containers
 down:
-	- RUNWITHMAKEBUILD=True docker-compose -f docker-compose.yml down
+	- RUNWITHMAKEBUILD=True docker-compose -f docker-compose.yml -f docker-compose.metrics.yml down
 nbdown: down
 jekyll:
 	- cd blog && bundle exec jekyll serve
@@ -80,6 +84,10 @@ keys:
 # Digital Ocean / Terraform
 list:
 	- doctl -t `cat /srv/secrets-newsblur/keys/digital_ocean.token` compute droplet list
+sizes:
+	- doctl -t `cat /srv/secrets-newsblur/keys/digital_ocean.token` compute size list
+ratelimit:
+	- doctl -t `cat /srv/secrets-newsblur/keys/digital_ocean.token` account ratelimit
 ansible-deps:
 	ansible-galaxy install -p roles -r ansible/roles/requirements.yml --roles-path ansible/roles
 tfrefresh:
@@ -90,6 +98,8 @@ apply:
 	terraform -chdir=terraform apply -refresh=false -parallelism=15
 inventory:
 	- ./ansible/utils/generate_inventory.py
+oldinventory:
+	- OLD=1 ./ansible/utils/generate_inventory.py
 
 # Docker
 pull:
@@ -152,6 +162,9 @@ firewall:
 	- ansible-playbook ansible/all.yml -l db --tags firewall
 oldfirewall:
 	- ANSIBLE_CONFIG=/srv/newsblur/ansible.old.cfg ansible-playbook ansible/all.yml  -l db --tags firewall
+repairmongo:
+	- sudo docker run -v "/srv/newsblur/docker/volumes/db_mongo:/data/db" mongo:4.0 mongod --repair --dbpath /data/db
+
 
 # performance tests
 perf-cli:

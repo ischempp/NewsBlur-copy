@@ -23,7 +23,8 @@ DOCKERBUILD = True
 DEBUG = False
 DEBUG = True
 DEBUG_ASSETS = True
-# DEBUG_QUERIES = True
+DEBUG_QUERIES = True
+DEBUG_QUERIES_SUMMARY_ONLY = True
 MEDIA_URL = '/media/'
 IMAGES_URL = '/imageproxy'
 SECRET_KEY = 'YOUR SECRET KEY'
@@ -96,8 +97,7 @@ MONGO_DB = {
 }
 MONGO_ANALYTICS_DB = {
     'name': 'nbanalytics',
-    'host': 'db_mongo',
-    'port': 29019,
+    'host': 'db_mongo:29019',
 }
 
 MONGODB_SLAVE = {
@@ -109,7 +109,7 @@ BROKER_URL = "redis://db_redis:6579/0"
 CELERY_RESULT_BACKEND = BROKER_URL
 CELERY_WORKER_CONCURRENCY = 1
 
-REDIS = {
+REDIS_USER = {
     'host': 'db_redis',
     'port': 6579
 }
@@ -172,13 +172,12 @@ DO_TOKEN_FABRIC = '0000000000000000000000000000000000000000000000000000000000000
 SERVER_NAME = "nblocalhost"
 NEWSBLUR_URL = os.getenv("NEWSBLUR_URL", "https://localhost")
 
-if NEWSBLUR_URL == 'https://nb.local.com':
-    SESSION_COOKIE_DOMAIN = ".nb.local.com"
+if NEWSBLUR_URL == 'https://localhost':
+    SESSION_COOKIE_DOMAIN = "localhost"
 
 SESSION_ENGINE = 'redis_sessions.session'
 
 # CORS_ORIGIN_REGEX_WHITELIST = ('^(https?://)?(\w+\.)?nb.local\.com$', )
 
-YOUTUBE_API_KEY = "000000000000000000000000000000000000000"
 RECAPTCHA_SECRET_KEY = "0000000000000000000000000000000000000000"
 IMAGES_SECRET_KEY = "0000000000000000000000000000000"

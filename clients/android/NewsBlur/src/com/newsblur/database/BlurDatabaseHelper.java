@@ -4,7 +4,6 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.os.AsyncTask;
 import android.os.CancellationSignal;
 import androidx.annotation.Nullable;
 import androidx.loader.content.AsyncTaskLoader;
@@ -41,6 +40,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Utility class for executing DB operations on the local, private NB database.
@@ -71,13 +72,12 @@ public class BlurDatabaseHelper {
     public void close() {
         // when asked to close, do so via an AsyncTask. This is so that (since becoming serial in android 4.0) 
         // the closure will happen after other async tasks are done using the conn
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... arg) {
-                synchronized (RW_MUTEX) {dbWrapper.close();}
-                return null;
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        executorService.execute(() -> {
+            synchronized (RW_MUTEX) {
+                dbWrapper.close();
             }
-        }.execute();
+        });
     }
 
     public void dropAndRecreateTables() {
@@ -307,9 +307,7 @@ public class BlurDatabaseHelper {
         Cursor c = dbRO.query(DatabaseConstants.STORY_TABLE, new String[]{DatabaseConstants.STORY_IMAGE_URLS}, null, null, null, null, null);
         Set<String> urls = new HashSet<String>(c.getCount());
         while (c.moveToNext()) {
-            for (String url : TextUtils.split(c.getString(c.getColumnIndexOrThrow(DatabaseConstants.STORY_IMAGE_URLS)), ",")) {
-                urls.add(url);
-            }
+            urls.addAll(Arrays.asList(TextUtils.split(c.getString(c.getColumnIndexOrThrow(DatabaseConstants.STORY_IMAGE_URLS)), ",")));
         }
         c.close();
         return urls;
@@ -681,9 +679,7 @@ public class BlurDatabaseHelper {
             socialIds.add(story.socialUserId);
         }
         if (story.friendUserIds != null) {
-            for (String id : story.friendUserIds) {
-                socialIds.add(id);
-            }
+            socialIds.addAll(Arrays.asList(story.friendUserIds));
         }
         if (socialIds.size() > 0) {
             impactedFeeds.add(FeedSet.multipleSocialFeeds(socialIds));
@@ -936,7 +932,7 @@ public class BlurDatabaseHelper {
         synchronized (RW_MUTEX) {dbRW.delete(DatabaseConstants.ACTION_TABLE, DatabaseConstants.ACTION_ID + " = ?", new String[]{actionId});}
     }
 
-    public void setStoryStarred(String hash, boolean starred) {
+    public void setStoryStarred(String hash, @Nullable List<String> userTags, boolean starred) {
         // check the story's starting state and the desired state and adjust it as an atom so we
         // know if it truly changed or not and thus whether to update counts
         synchronized (RW_MUTEX) {
@@ -955,8 +951,15 @@ public class BlurDatabaseHelper {
                 c.moveToFirst();
                 boolean origState = (c.getInt(c.getColumnIndexOrThrow(DatabaseConstants.STORY_STARRED)) > 0);
                 c.close();
+                // if already stared, update user tags
+                if (origState == starred && starred && userTags != null) {
+                    ContentValues values = new ContentValues();
+                    values.put(DatabaseConstants.STORY_USER_TAGS, TextUtils.join(",", userTags));
+                    dbRW.update(DatabaseConstants.STORY_TABLE, values, DatabaseConstants.STORY_HASH + " = ?", new String[]{hash});
+                    return;
+                }
                 // if there is nothing to be done, halt
-                if (origState == starred) {
+                else if (origState == starred) {
                     return;
                 }
                 // fix the state
@@ -1220,11 +1223,11 @@ public class BlurDatabaseHelper {
         StringBuilder q = new StringBuilder(DatabaseConstants.SESSION_STORY_QUERY_BASE);
         
         if (fs.isAllRead()) {
-            q.append(" ORDER BY " + DatabaseConstants.READ_STORY_ORDER);
+            q.append(" ORDER BY ").append(DatabaseConstants.READ_STORY_ORDER);
         } else if (fs.isGlobalShared()) {
-            q.append(" ORDER BY " + DatabaseConstants.SHARED_STORY_ORDER);
+            q.append(" ORDER BY ").append(DatabaseConstants.SHARED_STORY_ORDER);
         } else if (fs.isAllSaved()) {
-            q.append(" ORDER BY " + DatabaseConstants.getSavedStoriesSortOrder(order));
+            q.append(" ORDER BY ").append(DatabaseConstants.getSavedStoriesSortOrder(order));
         } else {
             q.append(" ORDER BY ").append(DatabaseConstants.getStorySortOrder(order));
         }
@@ -1285,7 +1288,7 @@ public class BlurDatabaseHelper {
 
             sel.append(" FROM " + DatabaseConstants.STORY_TABLE);
             sel.append(" WHERE " + DatabaseConstants.STORY_TABLE + "." + DatabaseConstants.STORY_FEED_ID + " IN ( ");
-            sel.append(TextUtils.join(",", fs.getMultipleFeeds()) + ")");
+            sel.append(TextUtils.join(",", fs.getMultipleFeeds())).append(")");
             DatabaseConstants.appendStorySelection(sel, selArgs, readFilter, stateFilter, fs.getSearchQuery());
 
         } else if (fs.getSingleSocialFeed() != null) {

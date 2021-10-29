@@ -47,6 +47,19 @@ public class PrefsUtils {
 		edit.commit();
 	}
 
+	@Nullable
+	public static String getCustomSever(Context context) {
+        SharedPreferences preferences = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        return preferences.getString(PrefConstants.PREF_CUSTOM_SERVER, null);
+    }
+
+	public static void clearCustomServer(Context context) {
+        SharedPreferences preferences = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        Editor edit = preferences.edit();
+        edit.remove(PrefConstants.PREF_CUSTOM_SERVER);
+        edit.commit();
+    }
+
 	public static void saveLogin(Context context, String userName, String cookie) {
 		SharedPreferences preferences = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
 		Editor edit = preferences.edit();
@@ -118,9 +131,9 @@ public class PrefsUtils {
         StringBuilder s = new StringBuilder();
         s.append("app version: ").append(getVersion(context));
         s.append("\n");
-        s.append("android version: ").append(Build.VERSION.RELEASE).append(" (" + Build.DISPLAY + ")");
+        s.append("android version: ").append(Build.VERSION.RELEASE).append(" (").append(Build.DISPLAY).append(")");
         s.append("\n");
-        s.append("device: ").append(Build.MANUFACTURER + " " + Build.MODEL + " (" + Build.BOARD + ")");
+        s.append("device: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append(" (").append(Build.BOARD).append(")");
         s.append("\n");
         s.append("sqlite version: ").append(FeedUtils.dbHelper.getEngineVersion());
         s.append("\n");
@@ -681,21 +694,35 @@ public class PrefsUtils {
         return DefaultFeedView.STORY;
     }
 
-    public static boolean isShowContentPreviews(Context context) {
+    public static StoryContentPreviewStyle getStoryContentPreviewStyle(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
-        return prefs.getBoolean(PrefConstants.STORIES_SHOW_PREVIEWS, true);
+        return StoryContentPreviewStyle.valueOf(
+                prefs.getString(PrefConstants.STORIES_SHOW_PREVIEWS_STYLE, StoryContentPreviewStyle.MEDIUM.toString()));
+    }
+
+    public static void setStoryContentPreviewStyle(Context context, StoryContentPreviewStyle value) {
+        SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        Editor editor = prefs.edit();
+        editor.putString(PrefConstants.STORIES_SHOW_PREVIEWS_STYLE, value.name());
+        editor.commit();
     }
 
     private static boolean isShowThumbnails(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
-        return prefs.getBoolean(PrefConstants.STORIES_SHOW_THUMBNAILS,  true);
+        return getThumbnailStyle(context) != ThumbnailStyle.OFF;
     }
+
+    public static void setThumbnailStyle(Context context, ThumbnailStyle value) {
+        SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        Editor editor = prefs.edit();
+        editor.putString(PrefConstants.STORIES_THUMBNAIL_STYLE, value.name());
+        editor.commit();
+    }
+
 
     public static ThumbnailStyle getThumbnailStyle(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
-        boolean isShowThumbnails = isShowThumbnails(context);
-        ThumbnailStyle defValue = isShowThumbnails ? ThumbnailStyle.LARGE : ThumbnailStyle.OFF;
-        return ThumbnailStyle.valueOf(prefs.getString(PrefConstants.STORIES_THUMBNAILS_STYLE, defValue.toString()));
+        String defaultValue = context.getString(R.string.thumbnail_style_default_value);
+        return ThumbnailStyle.valueOf(prefs.getString(PrefConstants.STORIES_THUMBNAIL_STYLE, defaultValue));
     }
 
     public static boolean isAutoOpenFirstUnread(Context context) {
@@ -706,6 +733,13 @@ public class PrefsUtils {
     public static boolean isMarkReadOnScroll(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
         return prefs.getBoolean(PrefConstants.STORIES_MARK_READ_ON_SCROLL, false);
+    }
+
+    public static void setMarkReadOnScroll(Context context, boolean value) {
+        SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        Editor editor = prefs.edit();
+        editor.putBoolean(PrefConstants.STORIES_MARK_READ_ON_SCROLL, value);
+        editor.commit();
     }
 
     public static boolean isOfflineEnabled(Context context) {
@@ -768,6 +802,11 @@ public class PrefsUtils {
         if (val.equals(PrefConstants.CACHE_AGE_SELECT_14D)) return PrefConstants.CACHE_AGE_VALUE_14D;
         if (val.equals(PrefConstants.CACHE_AGE_SELECT_30D)) return PrefConstants.CACHE_AGE_VALUE_30D;
         return PrefConstants.CACHE_AGE_VALUE_30D;
+    }
+
+    public static FeedListOrder getFeedListOrder(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PrefConstants.PREFERENCES, 0);
+        return FeedListOrder.valueOf(prefs.getString(PrefConstants.FEED_LIST_ORDER, FeedListOrder.ALPHABETICAL.toString()));
     }
 
     public static void applyThemePreference(Activity activity) {

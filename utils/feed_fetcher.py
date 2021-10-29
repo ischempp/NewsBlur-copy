@@ -20,6 +20,7 @@ import urllib.parse
 from django.conf import settings
 from django.db import IntegrityError
 from django.core.cache import cache
+from sentry_sdk import set_user
 from apps.reader.models import UserSubscription
 from apps.rss_feeds.models import Feed, MStory
 from apps.rss_feeds.page_importer import PageImporter
@@ -28,7 +29,10 @@ from apps.notifications.tasks import QueueNotifications
 from apps.notifications.models import MUserFeedNotification
 from apps.push.models import PushSubscription
 from apps.statistics.models import MAnalyticsFetcher, MStatistics
+
 import feedparser
+feedparser.sanitizer._HTMLSanitizer.acceptable_elements.update(['iframe'])
+
 from utils.story_functions import pre_process_story, strip_tags, linkify
 from utils import log as logging
 from utils.feed_functions import timelimit, TimeoutError
@@ -166,7 +170,8 @@ class FetchFeed:
                                                                                                  len(smart_str(raw_feed.content)), 
                                                                                                  raw_feed.headers))
             except Exception as e:
-                logging.debug("   ***> [%-30s] ~FRFeed failed to fetch with request, trying feedparser: %s" % (self.feed.log_title[:30], str(e)[:100]))
+                logging.debug("   ***> [%-30s] ~FRFeed failed to fetch with request, trying feedparser: %s" % (self.feed.log_title[:30], str(e)))
+                # raise e
             
             if not self.fpf or self.options.get('force_fp', False):
                 try:
@@ -661,12 +666,18 @@ class FeedFetcherWorker:
         """Update feed, since it may have changed"""
         return Feed.get_by_id(feed_id)
     
-    def process_feed_wrapper(self, feed_queue):
+    def reset_database_connections(self):
         connection._connections = {}
         connection._connection_settings ={}
         connection._dbs = {}
         settings.MONGODB = connect(settings.MONGO_DB_NAME, **settings.MONGO_DB)
-        settings.MONGOANALYTICSDB = connect(settings.MONGO_ANALYTICS_DB_NAME, **settings.MONGO_ANALYTICS_DB)
+        if 'username' in settings.MONGO_ANALYTICS_DB:
+            settings.MONGOANALYTICSDB = connect(db=settings.MONGO_ANALYTICS_DB['name'], host=f"mongodb://{settings.MONGO_ANALYTICS_DB['username']}:{settings.MONGO_ANALYTICS_DB['password']}@{settings.MONGO_ANALYTICS_DB['host']}/?authSource=admin", alias="nbanalytics")
+        else:
+            settings.MONGOANALYTICSDB = connect(db=settings.MONGO_ANALYTICS_DB['name'], host=f"mongodb://{settings.MONGO_ANALYTICS_DB['host']}/", alias="nbanalytics")
+
+    def process_feed_wrapper(self, feed_queue):
+        self.reset_database_connections()
         
         delta = None
         current_process = multiprocessing.current_process()
@@ -686,8 +697,11 @@ class FeedFetcherWorker:
             ret_entries = None
             start_time = time.time()
             ret_feed = FEED_ERREXC
+
+            set_user({"id": feed_id})
             try:
                 feed = self.refresh_feed(feed_id)
+                set_user({"id": feed_id, "username": feed.feed_title})
                 
                 skip = False
                 if self.options.get('fake'):
