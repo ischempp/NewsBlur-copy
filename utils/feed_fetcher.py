@@ -717,11 +717,6 @@ class FeedFetcherWorker:
                     rand = random.random()
                     if random_weight < 1000 and rand < quick:
                         skip = True
-                elif False and feed.feed_address.startswith("http://news.google.com/news"):
-                    skip = True
-                    weight = "-"
-                    quick = "-"
-                    rand = "-"
                 if skip:
                     logging.debug('   ---> [%-30s] ~BGFaking fetch, skipping (%s/month, %s subs, %s < %s)...' % (
                         feed.log_title[:30],
