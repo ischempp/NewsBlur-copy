@@ -7,13 +7,13 @@ from django.contrib.auth.models import User
 from mongoengine.connection import connect, disconnect
 
 from apps.reader.factories import UserSubscriptionFoldersFactory
-from apps.reader.models import UserSubscriptionFolders
+
 class Test_Reader(TestCase):
     fixtures = [
         'apps/rss_feeds/fixtures/initial_data.json',
         'apps/rss_feeds/fixtures/rss_feeds.json', 
-        'subscriptions.json', #'stories.json', 
-        'apps/rss_feeds/fixtures/gawker1.json']
+        'subscriptions.json',
+    ]
     
     def setUp(self):
         disconnect()
