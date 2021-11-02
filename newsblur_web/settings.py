@@ -31,7 +31,7 @@ import re
 import django.http
 import redis
 import sentry_sdk
-from boto.s3.connection import OrdinaryCallingFormat, S3Connection
+
 from mongoengine import connect
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
