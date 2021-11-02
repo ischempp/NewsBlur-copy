@@ -12,8 +12,7 @@ from apps.profile.factories import UserFactory
 from mongoengine.connection import connect, disconnect
 
 NEWSBLUR_DIR = settings.NEWSBLUR_DIR
-class Test_Feed(TransactionTestCase):
-
+class TestFeed(TransactionTestCase):
 
     def setUp(self):
         disconnect()
@@ -106,12 +105,13 @@ class Test_Feed(TransactionTestCase):
         old_story_guid = "tag:google.com,2005:reader/item/4528442633bc7b2b"
 
         feed = FeedFactory(
-            pk=11,
+            pk=5,
             feed_address=f'{NEWSBLUR_DIR}/apps/rss_feeds/fixtures/slashdot1.xml',
             feed_link='/apps/rss_feeds/fixtures/slashdot1.html',
             feed_title='Slashdot',
             last_update="2011-08-27 02:45:21"
         )
+        UserSubscriptionFoldersFactory(user=self.user, folders="[5]")
         UserSubscriptionFactory(user=self.user, feed=feed)
         feed = Feed.objects.get(feed_link__contains='slashdot')
         stories = MStory.objects(story_feed_id=feed.pk)
@@ -121,7 +121,6 @@ class Test_Feed(TransactionTestCase):
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 38)
 
-        UserSubscriptionFoldersFactory(user=self.user)
         response = self.client.get(reverse('load-feeds'))
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['5']['nt'], 38)
@@ -208,9 +207,13 @@ class Test_Feed(TransactionTestCase):
         old_story_guid = "blog.google:443/topics/inside-google/google-earths-incredible-3d-imagery-explained/"
         management.call_command('loaddata', 'google1.json', verbosity=1, skip_checks=False)
         feed = Feed.objects.get(pk=766)
+        
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 0)
 
+        UserSubscriptionFoldersFactory(user=self.user, folders="[766]")
+        UserSubscriptionFactory(feed=feed, user=self.user)
+        
         management.call_command('refresh_feed', force=False, feed=766, daemonize=False, skip_checks=False)
 
         stories = MStory.objects(story_feed_id=feed.pk)

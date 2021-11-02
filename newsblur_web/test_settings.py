@@ -1,4 +1,5 @@
 import os
+from mongoengine import connect
 
 DOCKERBUILD = os.getenv("DOCKERBUILD")
 
@@ -29,9 +30,10 @@ else:
         'name': 'newsblur_test',
         'host': '127.0.0.1:27017',
     }
-    
 
-MONGO_DATABASE_NAME = 'test_newsblur'
+MONGODB = connect(**MONGO_DB)
+
+MONGO_DATABASE_NAME = 'newsblur_test'
 
 DAYS_OF_UNREAD = 9999
 DAYS_OF_UNREAD_FREE = 9999
