@@ -202,7 +202,6 @@ class TestFeed(TransactionTestCase):
 
     def test_load_feeds__google(self):
         # Freezegun the date to 2017-04-30
-        
         self.client.login(username='conesus', password='test')
         old_story_guid = "blog.google:443/topics/inside-google/google-earths-incredible-3d-imagery-explained/"
         management.call_command('loaddata', 'google1.json', verbosity=1, skip_checks=False)
@@ -212,7 +211,7 @@ class TestFeed(TransactionTestCase):
         self.assertEqual(stories.count(), 0)
 
         UserSubscriptionFoldersFactory(user=self.user, folders="[766]")
-        UserSubscriptionFactory(feed=feed, user=self.user)
+        sub = UserSubscriptionFactory(feed=feed, user=self.user)
         
         management.call_command('refresh_feed', force=False, feed=766, daemonize=False, skip_checks=False)
 

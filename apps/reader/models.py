@@ -729,8 +729,8 @@ class UserSubscription(models.Model):
         oldest_unread_story_date = now
         
         if self.user.profile.last_seen_on < self.user.profile.unread_cutoff and not force:
-            # if not silent:
-            #     logging.info(' ---> [%s] SKIPPING Computing scores: %s (1 week+)' % (self.user, self.feed))
+            if not silent and settings.DEBUG:
+                logging.info(' ---> [%s] SKIPPING Computing scores: %s (1 week+)' % (self.user, self.feed))
             return self
         ong = self.unread_count_negative
         ont = self.unread_count_neutral
