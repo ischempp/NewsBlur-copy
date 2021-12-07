@@ -2,7 +2,7 @@ terraform {
   required_providers {
     digitalocean = {
       source = "digitalocean/digitalocean"
-      version = "1.22.2"
+      version = "~> 2.0"
     }
   }
 
@@ -514,12 +514,13 @@ resource "digitalocean_droplet" "db-metrics" {
   }
 }
 
+# apd -l "task-celery4*" --tags stop; servers=$(for i in {39..48}; do echo -n "-target=\"digitalocean_droplet.task-celery[$i]\" " ; done); tf apply -refresh=false `eval echo $servers`
 resource "digitalocean_droplet" "task-celery" {
   count    = 79
   image    = var.droplet_os
   name     = format("task-celery%02v", count.index+1)
   region   = var.droplet_region
-  size     = var.droplet_size
+  size     = var.droplet_size_10
   ssh_keys = [digitalocean_ssh_key.default.fingerprint]
   provisioner "local-exec" {
     # command = "/srv/newsblur/ansible/utils/generate_inventory.py; sleep 120"
