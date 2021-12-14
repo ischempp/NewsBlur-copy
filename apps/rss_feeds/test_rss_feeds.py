@@ -20,18 +20,13 @@ class TestFeed(TransactionTestCase):
         connect(**mongo_db)
         settings.REDIS_STORY_HASH_POOL = redis.ConnectionPool(host=settings.REDIS_STORY['host'], port=6579, db=10)
         settings.REDIS_FEED_READ_POOL = redis.ConnectionPool(host=settings.REDIS_SESSIONS['host'], port=6579, db=10)
-
-        r = redis.Redis(connection_pool=settings.REDIS_STORY_HASH_POOL)
-        r.delete('RS:1')
-        r.delete('lRS:1')
-        r.delete('RS:1:766')
-        r.delete('zF:766')
-        r.delete('F:766')
         self.user = UserFactory(username='conesus', password='test')
         self.client = Client()
 
     def tearDown(self):
         settings.MONGODB.drop_database('test_newsblur')
+        r = redis.Redis(connection_pool=settings.REDIS_STORY_HASH_POOL)
+        r.flushall()
 
     def test_load_feeds__gawker(self):
         self.client.login(username='conesus', password='test')
@@ -100,7 +95,7 @@ class TestFeed(TransactionTestCase):
         self.assertEqual(len(content['stories']), 6)
 
     def test_load_feeds__slashdot(self):
-        self.client.login(username='conesus', password='test')
+        self.client.force_login(self.user)
 
         old_story_guid = "tag:google.com,2005:reader/item/4528442633bc7b2b"
 
@@ -111,8 +106,9 @@ class TestFeed(TransactionTestCase):
             feed_title='Slashdot',
             last_update="2011-08-27 02:45:21"
         )
-        UserSubscriptionFoldersFactory(user=self.user, folders="[5]")
-        UserSubscriptionFactory(user=self.user, feed=feed)
+        UserSubscriptionFoldersFactory(user=self.user, folders=f"[{feed.pk}]")
+        UserSubscriptionFactory(feed=feed, user=self.user, active=True, needs_unread_recalc=True)
+
         feed = Feed.objects.get(feed_link__contains='slashdot')
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 0)
@@ -158,11 +154,15 @@ class TestFeed(TransactionTestCase):
         self.assertEqual(content['feeds']['5']['nt'], 37)
 
     def test_load_feeds__motherjones(self):
-        self.client.login(username='conesus', password='test')
+        self.client.force_login(self.user)
 
         management.call_command('loaddata', 'motherjones1.json', verbosity=0, skip_checks=False)
 
         feed = Feed.objects.get(feed_link__contains='motherjones')
+
+        UserSubscriptionFoldersFactory(user=self.user, folders=f"[{feed.pk}]")
+        UserSubscriptionFactory(feed=feed, user=self.user, needs_unread_recalc=True, active=True)
+
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 0)
 
@@ -175,7 +175,7 @@ class TestFeed(TransactionTestCase):
         content = json.decode(response.content)
         self.assertEqual(content['feeds'][str(feed.pk)]['nt'], 10)
 
-        self.client.post(reverse('mark-story-as-read'), {'story_id': stories[0].story_guid, 'feed_id': feed.pk})
+        response = self.client.post(reverse('mark-story-as-read'), {'story_id': stories[0].story_guid, 'feed_id': feed.pk})
 
         response = self.client.get(reverse('refresh-feeds'))
         content = json.decode(response.content)
@@ -203,7 +203,7 @@ class TestFeed(TransactionTestCase):
     def test_load_feeds__google(self):
         # Freezegun the date to 2017-04-30
         
-        self.client.login(username='conesus', password='test')
+        self.client.force_login(self.user)
         old_story_guid = "blog.google:443/topics/inside-google/google-earths-incredible-3d-imagery-explained/"
         management.call_command('loaddata', 'google1.json', verbosity=1, skip_checks=False)
         feed = Feed.objects.get(pk=766)
@@ -212,7 +212,7 @@ class TestFeed(TransactionTestCase):
         self.assertEqual(stories.count(), 0)
 
         UserSubscriptionFoldersFactory(user=self.user, folders="[766]")
-        UserSubscriptionFactory(feed=feed, user=self.user)
+        UserSubscriptionFactory(feed=feed, user=self.user, needs_unread_recalc=True)
         
         management.call_command('refresh_feed', force=False, feed=766, daemonize=False, skip_checks=False)
 
@@ -224,28 +224,28 @@ class TestFeed(TransactionTestCase):
         self.assertEqual(content['feeds']['766']['nt'], 20)
 
         old_story = MStory.objects.get(story_feed_id=feed.pk, story_guid__contains=old_story_guid)
-        self.client.post(reverse('mark-story-hashes-as-read'), {'story_hash': old_story.story_hash})
+        response = self.client.post(reverse('mark-story-hashes-as-read'), {'story_hash': old_story.story_hash})
 
-        response = self.client.get(reverse('refresh-feeds'))
+        response = self.client.get(reverse('load-feeds')+"?update_counts=true")
+
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['766']['nt'], 19)
 
         management.call_command('loaddata', 'google2.json', verbosity=1, skip_checks=False)
-        management.call_command('refresh_feed', force=False, feed=766, daemonize=False, skip_checks=False)
+        management.call_command('refresh_feed', force=False, feed=767, daemonize=False, skip_checks=False)
 
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 20)
 
-        url = reverse('load-single-feed', kwargs=dict(feed_id=766))
+        url = reverse('load-single-feed', kwargs=dict(feed_id=767))
         response = self.client.get(url)
-
         # pprint([c['story_title'] for c in json.decode(response.content)])
         feed = json.decode(response.content)
 
         # Test: 1 changed char in title
         self.assertEqual(len(feed['stories']), 6)
 
-        response = self.client.get(reverse('refresh-feeds'))
+        response = self.client.get(reverse('load-feeds')+"?update_counts=true")
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['766']['nt'], 19)
         

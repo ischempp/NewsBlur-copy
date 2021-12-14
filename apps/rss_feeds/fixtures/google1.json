@@ -3,9 +3,9 @@
         "pk": 766, 
         "model": "rss_feeds.feed", 
         "fields": {            
-            "feed_address": "%(NEWSBLUR_DIR)s/apps/rss_feeds/fixtures/google1.xml", 
+            "feed_address": "%(NEWSBLUR_DIR)sapps/rss_feeds/fixtures/google1.xml", 
             "days_to_trim": 90, 
-            "feed_link": "%(NEWSBLUR_DIR)s/apps/rss_feeds/fixtures/google.html", 
+            "feed_link": "%(NEWSBLUR_DIR)sapps/rss_feeds/fixtures/google.html", 
             "feed_link_locked": true,  
             "fetched_once": true,
             "num_subscribers": 1, 

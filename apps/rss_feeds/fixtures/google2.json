@@ -1,6 +1,6 @@
 [
     {
-        "pk": 766, 
+        "pk": 767, 
         "model": "rss_feeds.feed", 
         "fields": {            
             "feed_address": "%(NEWSBLUR_DIR)s/apps/rss_feeds/fixtures/google2.xml", 

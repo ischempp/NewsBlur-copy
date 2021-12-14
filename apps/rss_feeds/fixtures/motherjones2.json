@@ -1,6 +1,6 @@
 [
     {
-        "pk": 7, 
+        "pk": 8, 
         "model": "rss_feeds.feed", 
         "fields": {            
             "feed_address": "%(NEWSBLUR_DIR)s/apps/rss_feeds/fixtures/motherjones2.xml", 

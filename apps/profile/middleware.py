@@ -184,7 +184,8 @@ class SQLLogToConsoleMiddleware:
             }
             setattr(request, 'sql_times_elapsed', times_elapsed)
         else:
-            print(" ***> No queries")
+            # print(" ***> No queries")
+            pass
         if not getattr(settings, 'ORIGINAL_DEBUG', settings.DEBUG):
             settings.DEBUG = False
 

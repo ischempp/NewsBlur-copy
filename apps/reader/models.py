@@ -54,8 +54,11 @@ class UserSubscription(models.Model):
     objects = UserSubscriptionManager()
 
     def __str__(self):
-        return '[%s (%s): %s (%s)] ' % (self.user.username, self.user.pk, 
-                                        self.feed.feed_title, self.feed.pk)
+        return '[%s (%s): %s (%s) (%s/%s/%s)] ' % (self.user.username, self.user.pk, 
+                                                   self.feed.feed_title, self.feed.pk,
+                                                   self.unread_count_negative,
+                                                   self.unread_count_neutral,
+                                                   self.unread_count_positive)
         
     class Meta:
         unique_together = ("user", "feed")
@@ -111,6 +114,9 @@ class UserSubscription(models.Model):
     def story_hashes(cls, user_id, feed_ids=None, usersubs=None, read_filter="unread", order="newest", 
                      include_timestamps=False, group_by_feed=True, cutoff_date=None,
                      across_all_feeds=True):
+        """
+        returns list of story hashes based on various arguments
+        """
         r = redis.Redis(connection_pool=settings.REDIS_STORY_HASH_POOL)
         pipeline = r.pipeline()
         story_hashes = {} if group_by_feed else []
@@ -723,14 +729,14 @@ class UserSubscription(models.Model):
         
         return data
         
-    def calculate_feed_scores(self, silent=False, stories=None, force=False):
+    def calculate_feed_scores(self, silent=True, stories=None, force=False):
         # now = datetime.datetime.strptime("2009-07-06 22:30:03", "%Y-%m-%d %H:%M:%S")
         now = datetime.datetime.now()
         oldest_unread_story_date = now
         
         if self.user.profile.last_seen_on < self.user.profile.unread_cutoff and not force:
-            # if not silent:
-            #     logging.info(' ---> [%s] SKIPPING Computing scores: %s (1 week+)' % (self.user, self.feed))
+            if not silent:
+                logging.info(' ---> [%s] SKIPPING Computing scores: %s (1 week+)' % (self.user, self.feed))
             return self
         ong = self.unread_count_negative
         ont = self.unread_count_neutral
@@ -785,8 +791,8 @@ class UserSubscription(models.Model):
                     if story['story_date'] < oldest_unread_story_date:
                         oldest_unread_story_date = story['story_date']
 
-            # if not silent:
-            #     logging.info(' ---> [%s]    Format stories: %s' % (self.user, datetime.datetime.now() - now))
+            if not silent:
+                logging.info(' ---> [%s]    Format stories: %s' % (self.user, datetime.datetime.now() - now))
         
             classifier_feeds   = list(MClassifierFeed.objects(user_id=self.user_id, feed_id=self.feed_id, social_user_id=0))
             classifier_authors = list(MClassifierAuthor.objects(user_id=self.user_id, feed_id=self.feed_id))
@@ -799,13 +805,13 @@ class UserSubscription(models.Model):
                 not len(classifier_tags)):
                 self.is_trained = False
             
-            # if not silent:
-            #     logging.info(' ---> [%s]    Classifiers: %s (%s)' % (self.user, datetime.datetime.now() - now, classifier_feeds.count() + classifier_authors.count() + classifier_tags.count() + classifier_titles.count()))
+            if not silent:
+                logging.info(' ---> [%s]    Classifiers: %s (%s)' % (self.user, datetime.datetime.now() - now, classifier_feeds.count() + classifier_authors.count() + classifier_tags.count() + classifier_titles.count()))
             
             scores = {
                 'feed': apply_classifier_feeds(classifier_feeds, self.feed),
             }
-        
+            
             for story in unread_stories:
                 scores.update({
                     'author' : apply_classifier_authors(classifier_authors, story),
@@ -827,7 +833,6 @@ class UserSubscription(models.Model):
                     else:
                         feed_scores['neutral'] += 1
         else:
-            # print " ---> Cutoff date: %s" % date_delta
             unread_story_hashes = self.story_hashes(user_id=self.user_id, feed_ids=[self.feed_id],
                                                     usersubs=[self],
                                                     read_filter='unread', group_by_feed=False,
