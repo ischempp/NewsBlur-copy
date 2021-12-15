@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import os
 import time
 import sys
 import subprocess
-# import digitalocean
+import digitalocean
 
 OLD = False
 # Set env var OLD=1 to use existing servers
@@ -28,12 +28,8 @@ outfile = f"/srv/newsblur/ansible/inventories/digital_ocean{'.old' if OLD else '
 ansible_inventory_cmd = f'do-ansible-inventory -t {api_token} --out {outfile}'
 subprocess.call(ansible_inventory_cmd, shell=True)
 
-try:
-    with open(outfile, 'r') as original: 
-        data = original.read()
-except FileNotFoundError:
-    data = ""
-
+with open(outfile, 'r') as original: 
+    data = original.read()
 with open(outfile, 'w') as modified: 
     modified.write("127.0.0.1 ansible_connection=local\n" + data)
 

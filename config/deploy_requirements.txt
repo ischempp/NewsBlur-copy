@@ -1,2 +1,0 @@
-requests>=2.26,<3
-ansible-inventory>=0.6.3,<1
