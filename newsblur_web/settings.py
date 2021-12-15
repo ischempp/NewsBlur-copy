@@ -63,6 +63,7 @@ RECAPTCHA_SECRET_KEY = "YOUR_RECAPTCHA_KEY"
 YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"
 IMAGES_SECRET_KEY = "YOUR_IMAGES_SECRET_KEY"
 DOCKERBUILD = os.getenv("DOCKERBUILD")
+TESTBUILD = len(sys.argv) > 3 and sys.argv[1:2] == ['test']
 REDIS_USER = None
 FLASK_SENTRY_DSN = None
 
@@ -581,7 +582,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-if 'test' in sys.argv:
+if TESTBUILD:
     from newsblur_web.test_settings import *
 
 try:
