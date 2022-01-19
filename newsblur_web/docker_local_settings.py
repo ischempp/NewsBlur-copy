@@ -1,8 +1,6 @@
 import logging
 import os
 
-import pymongo
-
 # ===================
 # = Server Settings =
 # ===================
@@ -19,22 +17,29 @@ SESSION_COOKIE_DOMAIN = 'localhost'
 # ===================
 # = Global Settings =
 # ===================
+
 DOCKERBUILD = True
 DEBUG = False
-DEBUG = True
+# DEBUG = True
+
+# DEBUG_ASSETS controls JS/CSS asset packaging. Turning this off requires you to run 
+# `./manage.py collectstatic` first. Turn this on for development so you can see
+# changes in your JS/CSS. 
+DEBUG_ASSETS = False # Make sure to run `./manage.py collectstatic` first
 DEBUG_ASSETS = True
-DEBUG_QUERIES = True
+
+# DEBUG_QUERIES controls the output of the database query logs. Can be rather verbose
+# but is useful to catch slow running queries. A summary is also useful in cutting 
+# down verbosity.
+DEBUG_QUERIES = DEBUG
 DEBUG_QUERIES_SUMMARY_ONLY = True
+
 MEDIA_URL = '/media/'
 IMAGES_URL = '/imageproxy'
 SECRET_KEY = 'YOUR SECRET KEY'
 AUTO_PREMIUM_NEW_USERS = True
 AUTO_ENABLE_NEW_USERS = True
 ENFORCE_SIGNUP_CAPTCHA = False
-
-# CACHE_BACKEND = 'dummy:///'
-# CACHE_BACKEND = 'locmem:///'
-# CACHE_BACKEND = 'memcached://127.0.0.1:11211'
 
 CACHES = {
     'default': {

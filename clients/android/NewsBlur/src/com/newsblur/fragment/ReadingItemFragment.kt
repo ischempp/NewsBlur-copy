@@ -19,15 +19,17 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.chip.Chip
 import com.newsblur.R
 import com.newsblur.activity.FeedItemsList
-import com.newsblur.activity.NbActivity
 import com.newsblur.activity.Reading
 import com.newsblur.databinding.FragmentReadingitemBinding
 import com.newsblur.databinding.IncludeReadingItemCommentBinding
 import com.newsblur.domain.Classifier
 import com.newsblur.domain.Story
 import com.newsblur.domain.UserDetails
-import com.newsblur.fragment.StoryUserTagsFragment.Companion.newInstance
 import com.newsblur.network.APIManager
+import com.newsblur.service.NBSyncReceiver.Companion.UPDATE_INTEL
+import com.newsblur.service.NBSyncReceiver.Companion.UPDATE_SOCIAL
+import com.newsblur.service.NBSyncReceiver.Companion.UPDATE_STORY
+import com.newsblur.service.NBSyncReceiver.Companion.UPDATE_TEXT
 import com.newsblur.service.OriginalTextService
 import com.newsblur.util.*
 import com.newsblur.util.PrefConstants.ThemeValue
@@ -380,11 +382,11 @@ class ReadingItemFragment : NbFragment(), PopupMenu.OnMenuItemClickListener {
         binding.itemFeedBorder.setBackgroundColor(Color.parseColor("#$feedBorder"))
 
         if (faviconText == "black") {
-            binding.readingFeedTitle.setTextColor(UIUtils.getColor(requireContext(), R.color.text))
-            binding.readingFeedTitle.setShadowLayer(1f, 0f, 1f, UIUtils.getColor(requireContext(), R.color.half_white))
+            binding.readingFeedTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.text))
+            binding.readingFeedTitle.setShadowLayer(1f, 0f, 1f, ContextCompat.getColor(requireContext(), R.color.half_white))
         } else {
-            binding.readingFeedTitle.setTextColor(UIUtils.getColor(requireContext(), R.color.white))
-            binding.readingFeedTitle.setShadowLayer(1f, 0f, 1f, UIUtils.getColor(requireContext(), R.color.half_black))
+            binding.readingFeedTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
+            binding.readingFeedTitle.setShadowLayer(1f, 0f, 1f, ContextCompat.getColor(requireContext(), R.color.half_black))
         }
         if (!displayFeedDetails) {
             binding.readingFeedTitle.visibility = View.GONE
@@ -485,7 +487,7 @@ class ReadingItemFragment : NbFragment(), PopupMenu.OnMenuItemClickListener {
                     chip.chipIcon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_add_gray75)
                 }
                 v.setOnClickListener {
-                    val userTagsFragment = newInstance(story!!, fs!!)
+                    val userTagsFragment = StoryUserTagsFragment.newInstance(story!!, fs!!)
                     userTagsFragment.show(childFragmentManager, StoryUserTagsFragment::class.java.name)
                 }
                 binding.readingItemUserTags.addView(v)
@@ -497,8 +499,8 @@ class ReadingItemFragment : NbFragment(), PopupMenu.OnMenuItemClickListener {
             binding.readingItemAuthors.text = "•   " + story!!.authors
             if (classifier != null && classifier!!.authors.containsKey(story!!.authors)) {
                 when (classifier!!.authors[story!!.authors]) {
-                    Classifier.LIKE -> binding.readingItemAuthors.setTextColor(UIUtils.getColor(requireContext(), R.color.positive))
-                    Classifier.DISLIKE -> binding.readingItemAuthors.setTextColor(UIUtils.getColor(requireContext(), R.color.negative))
+                    Classifier.LIKE -> binding.readingItemAuthors.setTextColor(ContextCompat.getColor(requireContext(), R.color.positive))
+                    Classifier.DISLIKE -> binding.readingItemAuthors.setTextColor(ContextCompat.getColor(requireContext(), R.color.negative))
                     else -> binding.readingItemAuthors.setTextColor(UIUtils.getThemedColor(requireContext(), R.attr.readingItemMetadata, android.R.attr.textColor))
                 }
             }
@@ -598,19 +600,19 @@ class ReadingItemFragment : NbFragment(), PopupMenu.OnMenuItemClickListener {
     }
 
     fun handleUpdate(updateType: Int) {
-        if (updateType and NbActivity.UPDATE_STORY != 0) {
+        if (updateType and UPDATE_STORY != 0) {
             updateSaveButton()
             updateShareButton()
             setupItemCommentsAndShares()
         }
-        if (updateType and NbActivity.UPDATE_TEXT != 0) {
+        if (updateType and UPDATE_TEXT != 0) {
             reloadStoryContent()
         }
-        if (updateType and NbActivity.UPDATE_SOCIAL != 0) {
+        if (updateType and UPDATE_SOCIAL != 0) {
             updateShareButton()
             setupItemCommentsAndShares()
         }
-        if (updateType and NbActivity.UPDATE_INTEL != 0) {
+        if (updateType and UPDATE_INTEL != 0) {
             classifier = FeedUtils.dbHelper!!.getClassifierForFeed(story!!.feedId)
             setupTagsAndIntel()
         }

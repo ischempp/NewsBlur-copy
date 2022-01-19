@@ -19,7 +19,7 @@
     path: /srv/newsblur/newsblur_web/task_env.py
     line: 'SERVER_NAME = "{{ inventory_hostname }}"'
 
-- name: "Start docker containers"
+- name: "Start task-celery docker containers"
   become: yes
   docker_container:
     name: "{{ item.container_name }}"
@@ -48,6 +48,7 @@
       timeout: 10s
       retries: 3
       start_period: 30s
+    user: 1000:1001
     volumes:
       - /srv/newsblur:/srv/newsblur
       - /etc/hosts:/etc/hosts
