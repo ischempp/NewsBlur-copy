@@ -602,13 +602,10 @@ try:
 except ModuleNotFoundError:
     pass
 
-<<<<<<< HEAD
 if 'test' in sys.argv:
     from newsblur_web.test_settings import *
 
-=======
 started_task_or_app = False
->>>>>>> master
 try:
     from newsblur_web.task_env import *
     print(" ---> Starting NewsBlur task server...")

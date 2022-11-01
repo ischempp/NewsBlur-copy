@@ -6,12 +6,12 @@
             "domain": "localhost",
             "name": "NewsBlur"
         }
-    },    
+    },
     {
         "pk": 2,
         "model": "sites.site",
         "fields": {
-            "domain": "testserver",
+            "domain": "example.com",
             "name": "NewsBlur Tests"
         }
     },

@@ -1,5 +1,6 @@
 import redis
 from utils import json_functions as json
+from django.contrib.sites.models import Site
 from django.test.client import Client
 from django.test import TransactionTestCase
 from django.core import management
@@ -12,14 +13,24 @@ from apps.profile.factories import UserFactory
 from mongoengine.connection import connect, disconnect
 
 NEWSBLUR_DIR = settings.NEWSBLUR_DIR
-class TestFeed(TransactionTestCase):
 
+
+class TestFeed(TransactionTestCase):
     def setUp(self):
         disconnect()
         mongo_db = settings.MONGO_DB
         connect(**mongo_db)
-        settings.REDIS_STORY_HASH_POOL = redis.ConnectionPool(host=settings.REDIS_STORY['host'], port=6579, db=10)
-        settings.REDIS_FEED_READ_POOL = redis.ConnectionPool(host=settings.REDIS_SESSIONS['host'], port=6579, db=10)
+
+        site = Site.objects.get_current()
+        site.domain = 'testserver'
+        site.save()
+
+        settings.REDIS_STORY_HASH_POOL = redis.ConnectionPool(
+            host=settings.REDIS_STORY['host'], port=6579, db=10
+        )
+        settings.REDIS_FEED_READ_POOL = redis.ConnectionPool(
+            host=settings.REDIS_SESSIONS['host'], port=6579, db=10
+        )
         self.user = UserFactory(username='conesus', password='test')
         self.client = Client()
 
@@ -59,7 +70,7 @@ class TestFeed(TransactionTestCase):
         FeedFactory(
             pk=4,
             feed_address=f'{NEWSBLUR_DIR}/apps/rss_feeds/fixtures/gothamist_aug_2009_1.xml',
-            feed_link='http://gothamist.com'
+            feed_link='http://gothamist.com',
         )
 
         feed = Feed.objects.get(feed_link__contains='gothamist')
@@ -79,8 +90,7 @@ class TestFeed(TransactionTestCase):
         FeedFactory(
             pk=4,
             feed_address=f'{NEWSBLUR_DIR}/apps/rss_feeds/fixtures/gothamist_aug_2009_2.xml',
-            feed_link='http://gothamist.com'
-        
+            feed_link='http://gothamist.com',
         )
         feed.update(force=True)
 
@@ -104,7 +114,7 @@ class TestFeed(TransactionTestCase):
             feed_address=f'{NEWSBLUR_DIR}/apps/rss_feeds/fixtures/slashdot1.xml',
             feed_link='/apps/rss_feeds/fixtures/slashdot1.html',
             feed_title='Slashdot',
-            last_update="2011-08-27 02:45:21"
+            last_update="2011-08-27 02:45:21",
         )
         UserSubscriptionFoldersFactory(user=self.user, folders=f"[{feed.pk}]")
         UserSubscriptionFactory(feed=feed, user=self.user, active=True, needs_unread_recalc=True)
@@ -132,7 +142,7 @@ class TestFeed(TransactionTestCase):
             feed_address=f'{NEWSBLUR_DIR}/apps/rss_feeds/fixtures/slashdot2.xml',
             feed_link='/apps/rss_feeds/fixtures/slashdot1.html',
             feed_title='Slashdot',
-            last_update="2011-08-27 02:45:21"
+            last_update="2011-08-27 02:45:21",
         )
 
         management.call_command('refresh_feed', force=1, feed=5, daemonize=False, skip_checks=False)
@@ -175,7 +185,9 @@ class TestFeed(TransactionTestCase):
         content = json.decode(response.content)
         self.assertEqual(content['feeds'][str(feed.pk)]['nt'], 10)
 
-        response = self.client.post(reverse('mark-story-as-read'), {'story_id': stories[0].story_guid, 'feed_id': feed.pk})
+        response = self.client.post(
+            reverse('mark-story-as-read'), {'story_id': stories[0].story_guid, 'feed_id': feed.pk}
+        )
 
         response = self.client.get(reverse('refresh-feeds'))
         content = json.decode(response.content)
@@ -202,31 +214,33 @@ class TestFeed(TransactionTestCase):
 
     def test_load_feeds__google(self):
         # Freezegun the date to 2017-04-30
-        
+
         self.client.force_login(self.user)
         old_story_guid = "blog.google:443/topics/inside-google/google-earths-incredible-3d-imagery-explained/"
         management.call_command('loaddata', 'google1.json', verbosity=1, skip_checks=False)
         feed = Feed.objects.get(pk=766)
-        
+
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 0)
 
         UserSubscriptionFoldersFactory(user=self.user, folders="[766]")
         UserSubscriptionFactory(feed=feed, user=self.user, needs_unread_recalc=True)
-        
+
         management.call_command('refresh_feed', force=False, feed=766, daemonize=False, skip_checks=False)
 
         stories = MStory.objects(story_feed_id=feed.pk)
         self.assertEqual(stories.count(), 20)
 
-        response = self.client.get(reverse('load-feeds')+"?update_counts=true")
+        response = self.client.get(reverse('load-feeds') + "?update_counts=true")
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['766']['nt'], 20)
 
         old_story = MStory.objects.get(story_feed_id=feed.pk, story_guid__contains=old_story_guid)
-        response = self.client.post(reverse('mark-story-hashes-as-read'), {'story_hash': old_story.story_hash})
+        response = self.client.post(
+            reverse('mark-story-hashes-as-read'), {'story_hash': old_story.story_hash}
+        )
 
-        response = self.client.get(reverse('load-feeds')+"?update_counts=true")
+        response = self.client.get(reverse('load-feeds') + "?update_counts=true")
 
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['766']['nt'], 19)
@@ -245,10 +259,10 @@ class TestFeed(TransactionTestCase):
         # Test: 1 changed char in title
         self.assertEqual(len(feed['stories']), 6)
 
-        response = self.client.get(reverse('load-feeds')+"?update_counts=true")
+        response = self.client.get(reverse('load-feeds') + "?update_counts=true")
         content = json.decode(response.content)
         self.assertEqual(content['feeds']['766']['nt'], 19)
-        
+
     def test_load_feeds__brokelyn__invalid_xml(self):
         BROKELYN_FEED_ID = 16
         self.client.login(username='conesus', password='test')

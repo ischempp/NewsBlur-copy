@@ -5,11 +5,12 @@ DOCKERBUILD = os.getenv("DOCKERBUILD")
 
 DATABASES = {
     'default': {
-        'NAME': 'newslur_test',
+        'NAME': 'newsblur_test',
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'USER': 'newsblur',
         'PASSWORD': 'newsblur',
         'HOST': 'db_postgres',
+        'PORT': 5432,
     }
 }
 

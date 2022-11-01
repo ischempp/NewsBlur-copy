@@ -119,7 +119,7 @@ class SignupForm(forms.Form):
                 raise forms.ValidationError('Seriously, fuck off spammer.')
             try:
                 domain = email.rsplit('@', 1)[-1]
-                if not query(domain, 'MX'):
+                if settings.DEBUG and not query(domain, 'MX'):
                     raise forms.ValidationError('Sorry, that email is invalid.')
             except (NXDOMAIN, NoNameservers, NoAnswer):
                 raise forms.ValidationError('Sorry, that email is invalid.')
