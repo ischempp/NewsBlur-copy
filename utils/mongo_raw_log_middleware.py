@@ -27,6 +27,7 @@ class MongoDumpMiddleware(object):
             # save old methods
             setattr(MongoClient, '_logging', True)
             if hasattr(MongoClient, '_send_message_with_response'):
+                connection.queriesx = []
                 MongoClient._send_message_with_response = \
                         self._instrument(MongoClient._send_message_with_response)
                 MongoReplicaSetClient._send_message_with_response = \
@@ -93,8 +94,8 @@ def _mongodb_decode_wire_protocol(message):
     op = MONGO_OPS.get(opcode, 'unknown')
     zidx = 20
     collection_name_size = message[zidx:].find(b'\0')
-    collection_name = message[zidx:zidx+collection_name_size]
-    if b'.system.' in collection_name:
+    collection_name = message[zidx:zidx+collection_name_size].decode('utf-8')
+    if '.system.' in collection_name:
         return
     zidx += collection_name_size + 1
     skip, limit = struct.unpack('<ii', message[zidx:zidx+8])

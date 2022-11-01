@@ -41,10 +41,10 @@ class AppDirectoriesFinder(PipelineAppDirectoriesFinder):
         '*.markdown',
         '*.php',
         '*.txt',
-        # '*.gif',
+        # '*.gif', # due to django_extensions/css/jquery.autocomplete.css: django_extensions/img/indicator.gif
         '*.png',
         '*.jpg',
-        # '*.svg',
+        # '*.svg', # due to admin/css/base.css: admin/img/sorting-icons.svg
         '*.ico',
         '*.icns',
         '*.psd',

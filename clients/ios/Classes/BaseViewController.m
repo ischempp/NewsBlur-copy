@@ -1,5 +1,6 @@
 #import "BaseViewController.h"
 #import "NewsBlurAppDelegate.h"
+#import "NewsBlur-Swift.h"
 
 @implementation BaseViewController
 
@@ -102,9 +103,16 @@
 #pragma mark -
 #pragma mark Keyboard support
 - (void)addKeyCommandWithInput:(NSString *)input modifierFlags:(UIKeyModifierFlags)modifierFlags action:(SEL)action discoverabilityTitle:(NSString *)discoverabilityTitle {
+    [self addKeyCommandWithInput:input modifierFlags:modifierFlags action:action discoverabilityTitle:discoverabilityTitle wantPriority:NO];
+}
+
+- (void)addKeyCommandWithInput:(NSString *)input modifierFlags:(UIKeyModifierFlags)modifierFlags action:(SEL)action discoverabilityTitle:(NSString *)discoverabilityTitle wantPriority:(BOOL)wantPriority {
     UIKeyCommand *keyCommand = [UIKeyCommand keyCommandWithInput:input modifierFlags:modifierFlags action:action];
     if ([keyCommand respondsToSelector:@selector(discoverabilityTitle)] && [self respondsToSelector:@selector(addKeyCommand:)]) {
         keyCommand.discoverabilityTitle = discoverabilityTitle;
+        if (@available(iOS 15.0, *)) {
+            keyCommand.wantsPriorityOverSystemBehavior = wantPriority;
+        }
         [self addKeyCommand:keyCommand];
     }
 }
@@ -121,14 +129,7 @@
 	[super viewDidLoad];
     
     [[ThemeManager themeManager] addThemeGestureRecognizerToView:self.view];
-    
-    if (@available(iOS 13.0, *)) {
-        [[ThemeManager themeManager] systemAppearanceDidChange:self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark];
-    }
-}
-
-- (void) viewDidUnload {
-	[super viewDidUnload];
+    [[ThemeManager themeManager] systemAppearanceDidChange:self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark];
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
@@ -143,18 +144,14 @@
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     
-    if (@available(iOS 13.0, *)) {
-        if ([previousTraitCollection hasDifferentColorAppearanceComparedToTraitCollection:self.traitCollection]) {
-            [[ThemeManager themeManager] systemAppearanceDidChange:self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark];
-        }
+    if ([previousTraitCollection hasDifferentColorAppearanceComparedToTraitCollection:self.traitCollection]) {
+        [[ThemeManager themeManager] systemAppearanceDidChange:self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark];
     }
 }
 
 - (UIStatusBarStyle)preferredStatusBarStyle {
     if (!ThemeManager.themeManager.isDarkTheme) {
-        if (@available(iOS 13.0, *)) {
-            return UIStatusBarStyleDarkContent;
-        }
+        return UIStatusBarStyleDarkContent;
     }
     
     return UIStatusBarStyleLightContent;

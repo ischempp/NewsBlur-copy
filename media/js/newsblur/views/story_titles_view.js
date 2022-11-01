@@ -26,7 +26,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
     // = Render =
     // ==========
     
-    render: function() {
+    render: function(options) {
         // console.log(['render story_titles', this.options.override_layout, this.collection.length, this.$story_titles[0]]);
         this.clear();
         this.$story_titles.scrollTop(0);
@@ -39,7 +39,9 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
             return new NEWSBLUR.Views.StoryTitleView({
                 model: story,
                 collection: collection,
+                is_list: story_layout == 'list',
                 is_grid: story_layout == 'grid',
+                is_magazine: story_layout == 'magazine',
                 override_layout: override_layout,
                 on_dashboard: on_dashboard
             }).render();
@@ -54,7 +56,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
         this.fill_out();
         this.override_grid();
         
-        this.scroll_to_selected_story();
+        this.scroll_to_selected_story(null, options);
     },
     
     add: function(options) {
@@ -70,7 +72,9 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
                 return new NEWSBLUR.Views.StoryTitleView({
                     model: story,
                     collection: collection,
+                    is_list: story_layout == 'list',
                     is_grid: story_layout == 'grid',
+                    is_magazine: story_layout == 'magazine',
                     override_layout: override_layout,
                     on_dashboard: on_dashboard
                 }).render();
@@ -256,7 +260,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
         ]);
         var story_layout = this.options.override_layout ||
                            NEWSBLUR.assets.view_setting(NEWSBLUR.reader.active_feed, 'layout');
-        if (_.contains(['list', 'grid'], story_layout) || NEWSBLUR.assets.preference('mark_read_on_scroll_titles')) {
+        if (_.contains(['list', 'grid', 'magazine'], story_layout) || NEWSBLUR.assets.preference('mark_read_on_scroll_titles')) {
             var pane_height = this.$story_titles.height();
             var endbar_height = 20;
             var last_story_height = 80;
@@ -308,7 +312,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
         // console.log(["scroll_to_selected_story 1", story, options]);
         var story_title_visisble = this.$story_titles.isScrollVisible(story_title_view.$el);
         if (!story_title_visisble || options.force || 
-            _.contains(['list', 'grid'], story_layout)) {
+            _.contains(['list', 'grid', 'magazine'], story_layout)) {
             var container_offset = this.$story_titles.position().top;
             var scroll = story_title_view.$el.find('.NB-story-title').position().top;
             if (options.scroll_to_comments) {
@@ -318,7 +322,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
             var height = this.$story_titles.outerHeight();
             var position = scroll+container-height/5;
             // console.log(["scroll_to_selected_story 2", container_offset, scroll, container, height, position]);
-            if (_.contains(['list', 'grid'], story_layout)) {
+            if (_.contains(['list', 'grid', 'magazine'], story_layout)) {
                 position = scroll+container;
             }
             if (story_layout == 'grid') {
@@ -327,7 +331,7 @@ NEWSBLUR.Views.StoryTitlesView = Backbone.View.extend({
             
             // console.log(["scroll_to_selected_story 3", position]);
             this.$story_titles.stop().scrollTo(position, {
-                duration: NEWSBLUR.assets.preference('animations') ? 260 : 0,
+                duration: !options.immediate && NEWSBLUR.assets.preference('animations') ? 260 : 0,
                 queue: false
             });
         }    

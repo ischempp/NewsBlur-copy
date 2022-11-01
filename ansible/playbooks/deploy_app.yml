@@ -13,6 +13,7 @@
 
     - name: Update Sentry release
       connection: local
+      run_once: yes
       shell: >
         curl {{ sentry_web_release_webhook }}/ \
         -X POST \
@@ -70,7 +71,7 @@
       run_once: yes
       connection: local
       amazon.aws.aws_s3:
-        bucket: newsblur_backups
+        bucket: newsblur-backups
         object: /static_py3.tgz
         src: /srv/newsblur/static.tgz
         mode: put
@@ -80,21 +81,12 @@
       tags:
         - never
         - static
-
-    - name: Pull newsblur_web github
-      git:
-        repo: https://github.com/samuelclay/NewsBlur.git
-        dest: /srv/newsblur/
-        version: master
-      register: pulled
-      tags:
-        - static
     
     - name: Downloading JS/CSS assets from S3
       vars:
         ansible_python_interpreter: /usr/bin/python3  
       amazon.aws.aws_s3:
-        bucket: newsblur_backups
+        bucket: newsblur-backups
         object: /static_py3.tgz
         dest: /srv/newsblur/static.tgz
         mode: get
@@ -114,16 +106,25 @@
       tags:
         - never
         - static
+
+    - name: Pull newsblur_web github
+      git:
+        repo: https://github.com/samuelclay/NewsBlur.git
+        dest: /srv/newsblur/
+        version: master
+      register: pulled
+      tags:
+        - static
     
-    - name: Reload gunicorn
+    - name: Reload gunicorn due to no git upstream changes
       become: yes
       block:
-        - name: Find gunicorn master process
+        - name: Find gunicorn process
           shell: "ps -C gunicorn fch -o pid | head -n 1"
           register: psaux
         - name: Reload gunicorn
           command: "kill -HUP {{ psaux.stdout }}"
-      # when: pulled.changed
+      when: not pulled.changed
       tags:
         - static
     

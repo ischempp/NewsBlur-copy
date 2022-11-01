@@ -45,24 +45,39 @@ NEWSBLUR.Models.Story = Backbone.Model.extend({
         return score_name;
     },
     
-    content_preview: function(attribute, length) {
+    content_preview: function(attribute, length, preserve_paragraphs) {
         var content = this.get(attribute);
         if (!attribute || !content) content = this.story_content(); 
         // First do a naive strip, which is faster than rendering which makes network calls
-        content = content && content.replace(/<(?:.|\n)*?>/gm, ' ');
-        content = content && Inflector.stripTags(content);
-        content = content && content.replace(/[\u00a0\u200c]/g, ' '); // Invisible space, boo
-        content = content && content.replace(/\s+/gm, ' ');
+        content = content && content
+            .replace(/<p(>| [^>]+>)/ig, '\n\n')
+            .replace(/(<br(\s*\/)?>\s*){3,}/igm, '\n\n')
+            .replace(/<(\/)?h[1-6].*?>/igm, '\n\n')
+            .replace(/<(div).*?>/igm, '\n\n')
+            .replace(/<blockquote.*?>/igm, '\n\n&gt; ')
+            .replace(/<[^>]+>/ig, ' ')
+            .replace(/&nbsp;/ig, ' ')
+            .replace(/[\u00a0\u200c]/g, ' ') // Invisible space, boo
+            .replace(/(\n\s*\n){1,}/gm, '\n\n')
+            .replace(/\n\n&gt;\s+/gm, '\n\n&gt; ')
+            .replace(/([^\n])\n([^\n])/gm, '$1 $2');
+        
+        if (!preserve_paragraphs) {
+            content = content && content.replace(/\s+/gm, ' ');
+        }
 
-        return _.string.prune(_.string.trim(content), length || 150, "...");
+        content = _.string.prune(_.string.trim(content), length || 150, "...");
+        if (preserve_paragraphs) {
+            content = content.replace(/\n/gm, '<br>')
+        }
+        return content
     },
     
     image_url: function(index) {
         if (!index) index = 0;
-        if (this.get('image_urls').length >= index+1) {
+        if (this.get('image_urls') && this.get('image_urls').length >= index+1) {
             var url = this.get('image_urls')[index];
             if (window.location.protocol == 'https:' && 
-                NEWSBLUR.Globals.is_staff &&
                 _.str.startsWith(url, "http://")) {
                 var secure_url = this.get('secure_image_urls')[url];
                 if (secure_url) url = secure_url;
@@ -94,9 +109,9 @@ NEWSBLUR.Models.Story = Backbone.Model.extend({
         return content;
     },
     
-    story_authors: function() {
-        return this.get('story_authors').replace(/</g, '&lt;')
-                                        .replace(/>/g, '&gt;');
+    story_authors: function () {
+        let authors = this.get('story_authors') || "";
+        return authors.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
     
     user_highlights: function() {
@@ -221,7 +236,7 @@ NEWSBLUR.Models.Story = Backbone.Model.extend({
             }
         }
         
-        if (background && !$.browser.mozilla) {
+        if (background && !$.browser.mozilla && false) {
             var anchor, event;
 
             anchor = document.createElement("a");
@@ -230,13 +245,15 @@ NEWSBLUR.Models.Story = Backbone.Model.extend({
             event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, true, false, false, true, 0, null);
             var success = anchor.dispatchEvent(event);
             if (success) {
-                // console.log(['Opened link in background', anchor.href]);
+                console.log(['Opened link in background', anchor.href]);
                 return success;
             } else {
-                // console.log(['Failed to open link in background', anchor.href]);
+                console.log(['Failed to open link in background', anchor.href]);
             }
-        } else {
-            window.open(this.get('story_permalink'), '_blank');
+        }
+            
+        window.open(this.get('story_permalink'), '_blank');
+        if (!background) {
             window.focus();
         }
     },
@@ -425,11 +442,14 @@ NEWSBLUR.Collections.Stories = Backbone.Collection.extend({
     
     mark_unread: function(story, options) {
         options = options || {};
+
         NEWSBLUR.assets.mark_story_as_unread(story.id, story.get('story_feed_id'), _.bind(function(read) {
-            this.update_read_count(story, {unread: true});
+            this.update_read_count(story, { unread: true });
+            NEWSBLUR.assets.get_feed(story.get('story_feed_id')).force_update_counts();
         }, this), _.bind(function(data) {
             story.set('read_status', 1, {'error_marking_unread': true, 'message': data.message});
             this.update_read_count(story, {unread: false});
+            NEWSBLUR.assets.get_feed(story.get('story_feed_id')).force_update_counts();
         }, this));
         story.set('read_status', 0);
     },
@@ -439,8 +459,6 @@ NEWSBLUR.Collections.Stories = Backbone.Collection.extend({
         
         if (options.previously_read) return;
 
-        var story_unread_counter  = NEWSBLUR.app.story_unread_counter;
-        var unread_view           = NEWSBLUR.reader.get_unread_view_name();
         var active_feed           = NEWSBLUR.assets.get_feed(NEWSBLUR.reader.active_feed);
         var story_feed            = NEWSBLUR.assets.get_feed(story.get('story_feed_id'));
         var friend_feeds          = NEWSBLUR.assets.get_friend_feeds(story);
@@ -479,10 +497,6 @@ NEWSBLUR.Collections.Stories = Backbone.Collection.extend({
                 var socialsub_count = Math.max(socialsub.get('ng') + (options.unread?1:-1), 0);
                 socialsub.set('ng', socialsub_count, {instant: true});
             });
-        }
-        
-        if (story_unread_counter) {
-            story_unread_counter.flash();
         }
         
         // if ((unread_view == 'positive' && feed.get('ps') == 0) ||
@@ -593,8 +607,9 @@ NEWSBLUR.Collections.Stories = Backbone.Collection.extend({
         this.models = this.models.slice(0, count);
     },
 
-    limit_visible_on_dashboard: function (count, score) {
-        score = _.isUndefined(score) ? NEWSBLUR.reader.get_unread_view_score() : score;
+    limit_visible_on_dashboard: function (count) {
+        if (!NEWSBLUR.Globals.is_premium) count = 3;
+        // var score = NEWSBLUR.reader.get_unread_view_score();
 
         while (this.models.length) {
             if (this.models.length <= count) return;

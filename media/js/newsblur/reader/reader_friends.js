@@ -142,7 +142,7 @@ _.extend(NEWSBLUR.ReaderFriends.prototype, {
             $services.append($service);
         }, this));
        
-        $autofollow = $.make('div', { className: 'NB-friends-service NB-friends-autofollow'}, [
+        var $autofollow = $.make('div', { className: 'NB-friends-service NB-friends-autofollow'}, [
             $.make('input', { type: 'checkbox', className: 'NB-friends-autofollow-checkbox', id: 'NB-friends-autofollow-checkbox', checked: this.autofollow ? 'checked' : null }),
             $.make('label', { className: 'NB-friends-autofollow-label', 'for': 'NB-friends-autofollow-checkbox' }, [
                 'Auto-follow',
@@ -168,7 +168,7 @@ _.extend(NEWSBLUR.ReaderFriends.prototype, {
         if (this.recommended_users && this.recommended_users.length) {
             _.each(this.recommended_users, function(profile) {
                 var profile_model = new NEWSBLUR.Models.User(profile);
-                $profile_badge = new NEWSBLUR.Views.SocialProfileBadge({
+                var $profile_badge = new NEWSBLUR.Views.SocialProfileBadge({
                     model: profile_model
                 });
                 $findlist.append($profile_badge);

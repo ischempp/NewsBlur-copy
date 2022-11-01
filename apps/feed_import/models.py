@@ -101,7 +101,11 @@ class OPMLExporter(Importer):
             except Feed.DoesNotExist:
                 continue
         self.feeds = dict(self.feeds)
-        
+
+    @property
+    def feed_count(self):
+        return len(self.feeds)
+
 
 class OPMLImporter(Importer):
     

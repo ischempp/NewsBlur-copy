@@ -12,12 +12,6 @@ public class AppConstants {
     public static final boolean VERBOSE_LOG_NET = false;
 	
 	public static final String FOLDER_PRE = "folder_collapsed";
-
-    // reading view font sizes. in em
-	public static final float[] READING_FONT_SIZE = {0.75f, 0.9f, 1.0f, 1.2f, 1.5f, 2.0f};
-
-    // story list view font sizes. as a fraction of the default font sizes used
-	public static final float[] LIST_FONT_SIZE = {0.7f, 0.85f, 1.0f, 1.2f, 1.4f, 1.8f};
 	
     // the name to give the "root" folder in the local DB since the API does not assign it one.
     // this name should be unique and such that it will sort to the beginning of a list, ideally.
@@ -100,5 +94,20 @@ public class AppConstants {
 
     // Free standard account sites limit
     public final static int FREE_ACCOUNT_SITE_LIMIT = 64;
+
+    // The following keys are used to mark the position of the special meta-folders within
+    // the folders array.  Since the ExpandableListView doesn't handle collapsing of views
+    // set to View.GONE, we have to totally remove any hidden groups from the group count
+    // and adjust all folder indicies accordingly. Fake folders are created with these
+    // very unlikely names and layout methods check against them before assuming a row is
+    // a normal folder.  All the string comparison is a small price to pay to avoid the
+    // alternative of index-counting in a situation where some rows might be disabled.
+    public static final String GLOBAL_SHARED_STORIES_GROUP_KEY = "GLOBAL_SHARED_STORIES_GROUP_KEY";
+    public static final String ALL_SHARED_STORIES_GROUP_KEY = "ALL_SHARED_STORIES_GROUP_KEY";
+    public static final String ALL_STORIES_GROUP_KEY = "ALL_STORIES_GROUP_KEY";
+    public static final String INFREQUENT_SITE_STORIES_GROUP_KEY = "INFREQUENT_SITE_STORIES_GROUP_KEY";
+    public static final String READ_STORIES_GROUP_KEY = "READ_STORIES_GROUP_KEY";
+    public static final String SAVED_STORIES_GROUP_KEY = "SAVED_STORIES_GROUP_KEY";
+    public static final String SAVED_SEARCHES_GROUP_KEY = "SAVED_SEARCHES_GROUP_KEY";
 
 }

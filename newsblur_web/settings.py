@@ -32,15 +32,15 @@ import re
 import django.http
 import redis
 import sentry_sdk
-
-from mongoengine import connect
-from sentry_sdk.integrations.celery import CeleryIntegration
+import paypalrestsdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
 import django.http
 import re
 from mongoengine import connect
+from pymongo import monitoring
+from utils.mongo_command_monitor import MongoCommandLogger
 import boto3
 
 # ===================
@@ -54,8 +54,9 @@ ADMINS       = (
 SERVER_NAME  = 'newsblur'
 SERVER_EMAIL = 'server@newsblur.com'
 HELLO_EMAIL  = 'hello@newsblur.com'
-NEWSBLUR_URL = 'http://www.newsblur.com'
+NEWSBLUR_URL = 'https://www.newsblur.com'
 IMAGES_URL   = 'https://imageproxy.newsblur.com'
+PUSH_DOMAIN  = 'push.newsblur.com'
 SECRET_KEY            = 'YOUR_SECRET_KEY'
 IMAGES_SECRET_KEY = "YOUR_SECRET_IMAGE_KEY"
 DNSIMPLE_TOKEN = "YOUR_DNSIMPLE_TOKEN"
@@ -94,9 +95,13 @@ ALLOWED_HOSTS         = ['*']
 AUTO_PREMIUM_NEW_USERS = True
 AUTO_ENABLE_NEW_USERS = True
 ENFORCE_SIGNUP_CAPTCHA = False
+ENABLE_PUSH           = True
 PAYPAL_TEST           = False
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880 # 5 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880 # 5 MB
+PROMETHEUS_EXPORT_MIGRATIONS = False
+MAX_SECONDS_COMPLETE_ARCHIVE_FETCH = 60 * 60 * 1 # 1 hour
+MAX_SECONDS_ARCHIVE_FETCH_SINGLE_FEED = 60 * 15 # 15 minutes
 
 # Uncomment below to force all feeds to store this many stories. Default is to cut 
 # off at 25 stories for single subscriber non-premium feeds and 500 for popular feeds.
@@ -108,6 +113,7 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880 # 5 MB
 
 
 MIDDLEWARE = (
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'subdomains.middleware.SubdomainMiddleware',
@@ -125,8 +131,8 @@ MIDDLEWARE = (
     'utils.request_introspection_middleware.DumpRequestMiddleware',
     'apps.profile.middleware.DBProfilerMiddleware',
     'apps.profile.middleware.SQLLogToConsoleMiddleware',
-    'utils.mongo_raw_log_middleware.MongoDumpMiddleware',
     'utils.redis_raw_log_middleware.RedisDumpMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 )
 
 AUTHENTICATION_BACKENDS = (
@@ -221,6 +227,12 @@ LOGGING = {
             # 'level': 'DEBUG',
             'propagate': False,
         },
+        'zebra': {
+            'handlers': ['console', 'log_file'],
+            # 'level': 'ERROR',
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         'newsblur': {
             'handlers': ['console', 'log_file'],
             'level': 'DEBUG',
@@ -257,11 +269,21 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 DAYS_OF_UNREAD          = 30
 DAYS_OF_UNREAD_FREE     = 14
+DAYS_OF_UNREAD_ARCHIVE  = 9999
 # DoSH can be more, since you can up this value by N, and after N days,
-# you can then up the DAYS_OF_UNREAD value with no impact.
-DAYS_OF_STORY_HASHES    = 30
+# you can then up the DAYS_OF_UNREAD value with no impact. 
+# The max is for archive subscribers.
+DAYS_OF_STORY_HASHES    = DAYS_OF_UNREAD
+DAYS_OF_STORY_HASHES_ARCHIVE = DAYS_OF_UNREAD_ARCHIVE
 
+# SUBSCRIBER_EXPIRE sets the number of days after which a user who hasn't logged in
+# is no longer considered an active subscriber
 SUBSCRIBER_EXPIRE       = 7
+
+# PRO_MINUTES_BETWEEN_FETCHES sets the number of minutes to fetch feeds for 
+# Premium Pro accounts. Defaults to every 5 minutes, but that's for NewsBlur
+# servers. On your local, you should probably set this to 10-15 minutes
+PRO_MINUTES_BETWEEN_FETCHES = 5
 
 ROOT_URLCONF            = 'newsblur_web.urls'
 INTERNAL_IPS            = ('127.0.0.1',)
@@ -312,6 +334,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_extensions',
+    'django_prometheus',
     'paypal.standard.ipn',
     'apps.rss_feeds',
     'apps.reader',
@@ -338,13 +361,16 @@ INSTALLED_APPS = (
     'pipeline',
 )
 
-# ==========
-# = Stripe =
-# ==========
+# ===================
+# = Stripe & Paypal =
+# ===================
 
 STRIPE_SECRET = "YOUR-SECRET-API-KEY"
 STRIPE_PUBLISHABLE = "YOUR-PUBLISHABLE-API-KEY"
 ZEBRA_ENABLE_APP = True
+
+PAYPAL_API_CLIENTID = "YOUR-PAYPAL-API-CLIENTID"
+PAYPAL_API_SECRET = "YOUR-PAYPAL-API-SECRET"
 
 # ==========
 # = Celery =
@@ -559,7 +585,7 @@ BACKED_BY_AWS = {
 }
 
 PROXY_S3_PAGES = True
-S3_BACKUP_BUCKET = 'newsblur_backups'
+S3_BACKUP_BUCKET = 'newsblur-backups'
 S3_PAGES_BUCKET_NAME = 'pages.newsblur.com'
 S3_ICONS_BUCKET_NAME = 'icons.newsblur.com'
 S3_AVATARS_BUCKET_NAME = 'avatars.newsblur.com'
@@ -576,20 +602,27 @@ try:
 except ModuleNotFoundError:
     pass
 
+<<<<<<< HEAD
 if 'test' in sys.argv:
     from newsblur_web.test_settings import *
 
+=======
+started_task_or_app = False
+>>>>>>> master
 try:
     from newsblur_web.task_env import *
     print(" ---> Starting NewsBlur task server...")
+    started_task_or_app = True
 except ModuleNotFoundError:
     pass
 try:
     from newsblur_web.app_env import *
     print(" ---> Starting NewsBlur app server...")
+    started_task_or_app = True
 except ModuleNotFoundError:
     pass
-
+if not started_task_or_app:
+    print(" ---> Starting NewsBlur development server...")
 
 if not DEBUG:
     INSTALLED_APPS += (
@@ -621,14 +654,24 @@ AWS_SECRET_ACCESS_KEY = S3_SECRET
 os.environ["AWS_ACCESS_KEY_ID"] = AWS_ACCESS_KEY_ID
 os.environ["AWS_SECRET_ACCESS_KEY"] = AWS_SECRET_ACCESS_KEY
 
-def custom_show_toolbar(request):
-    return DEBUG
+def clear_prometheus_aggregation_stats():
+    prom_folder = '/srv/newsblur/.prom_cache'
+    os.makedirs(prom_folder, exist_ok=True)
+    os.environ['PROMETHEUS_MULTIPROC_DIR'] = prom_folder
+    for filename in os.listdir(prom_folder):
+        file_path = os.path.join(prom_folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            if 'No such file' in str(e):
+                return
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-DEBUG_TOOLBAR_CONFIG = {
-    'INTERCEPT_REDIRECTS': True,
-    'SHOW_TOOLBAR_CALLBACK': custom_show_toolbar,
-    'HIDE_DJANGO_SQL': False,
-}
+
+clear_prometheus_aggregation_stats()
 
 if DEBUG:
     template_loaders = [
@@ -677,6 +720,9 @@ ANYMAIL = {
 # =========
 # = Mongo =
 # =========
+
+MONGO_COMMAND_LOGGER = MongoCommandLogger()
+monitoring.register(MONGO_COMMAND_LOGGER)
 
 MONGO_DB_DEFAULTS = {
     'name': 'newsblur',
@@ -748,13 +794,8 @@ SESSION_REDIS = {
 
 CACHES = {
     'default': {
-        'BACKEND': 'redis_cache.RedisCache',
-        'LOCATION': '%s:%s' % (REDIS_USER['host'], REDIS_PORT),
-        'OPTIONS': {
-            'DB': 6,
-            'PARSER_CLASS': 'redis.connection.HiredisParser',
-            'SERIALIZER_CLASS': 'redis_cache.serializers.PickleSerializer'
-        },
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://%s:%s/6' % (REDIS_USER['host'], REDIS_PORT),
     },
 }
 
@@ -762,11 +803,9 @@ REDIS_POOL                 = redis.ConnectionPool(host=REDIS_USER['host'], port=
 REDIS_ANALYTICS_POOL       = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=2, decode_responses=True)
 REDIS_STATISTICS_POOL      = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=3, decode_responses=True)
 REDIS_FEED_UPDATE_POOL     = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=4, decode_responses=True)
-# REDIS_STORY_HASH_POOL2   = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=8) # Only used when changing DAYS_OF_UNREAD
 REDIS_STORY_HASH_TEMP_POOL = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=10, decode_responses=True)
 # REDIS_CACHE_POOL         = redis.ConnectionPool(host=REDIS_USER['host'], port=REDIS_PORT, db=6) # Duped in CACHES
 REDIS_STORY_HASH_POOL      = redis.ConnectionPool(host=REDIS_STORY['host'], port=REDIS_PORT, db=1, decode_responses=True)
-REDIS_STORY_HASH_POOL_ENCODED = redis.ConnectionPool(host=REDIS_STORY['host'], port=REDIS_PORT, db=1, decode_responses=False)
 REDIS_FEED_READ_POOL       = redis.ConnectionPool(host=REDIS_SESSIONS['host'], port=REDIS_PORT, db=1, decode_responses=True)
 REDIS_FEED_SUB_POOL        = redis.ConnectionPool(host=REDIS_SESSIONS['host'], port=REDIS_PORT, db=2, decode_responses=True)
 REDIS_SESSION_POOL         = redis.ConnectionPool(host=REDIS_SESSIONS['host'], port=REDIS_PORT, db=5, decode_responses=True)
@@ -812,8 +851,8 @@ PIPELINE = {
     'JS_COMPRESSOR': 'pipeline.compressors.closure.ClosureCompressor',
     # 'CSS_COMPRESSOR': 'pipeline.compressors.NoopCompressor',
     # 'JS_COMPRESSOR': 'pipeline.compressors.NoopCompressor',
-    'CLOSURE_BINARY': '/usr/bin/java -jar node_modules/google-closure-compiler-java/compiler.jar',
-    'CLOSURE_ARGUMENTS': '--language_in ECMASCRIPT_2021',# --warning_level QUIET',
+    'CLOSURE_BINARY': '/usr/bin/java -jar /usr/local/bin/compiler.jar',
+    'CLOSURE_ARGUMENTS': '--language_in ECMASCRIPT_2016 --language_out ECMASCRIPT_2016 --warning_level DEFAULT',
     'JAVASCRIPT': {
         'common': {
             'source_filenames': assets['javascripts']['common'],
@@ -854,6 +893,12 @@ PIPELINE = {
         },
     }
 }
+
+paypalrestsdk.configure({
+    "mode": "sandbox" if DEBUG else "live",
+    "client_id": PAYPAL_API_CLIENTID,
+    "client_secret": PAYPAL_API_SECRET
+})
 
 # =======
 # = AWS =

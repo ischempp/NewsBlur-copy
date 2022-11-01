@@ -1,4 +1,8 @@
+import os
+import re
 import struct
+import datetime
+import random
 from django.contrib.sites.models import Site
 from django.conf import settings
 from django import template
@@ -9,6 +13,7 @@ from vendor.timezones.utilities import localtime_for_timezone
 from utils.user_functions import get_user
 from django.utils.safestring import mark_safe
 from pipeline.templatetags.pipeline import stylesheet, javascript
+from pipeline.templatetags.pipeline import JavascriptNode, StylesheetNode
 
 register = template.Library()
 
@@ -104,12 +109,45 @@ def render_dashboard_river(context, dashboard_river):
 @register.inclusion_tag('reader/account_module.xhtml', takes_context=True)
 def render_account_module(context):
     user    = get_user(context['user'])
-
+    reasons = [
+        "Enable every site by going premium",
+        "Sites updated up to 5x more often",
+        "Read the River of News (reading by folder)",
+        "Search sites and folders",
+        "Save stories with searchable tags",
+        "Privacy options for your blurblog",
+        "Custom RSS feeds for saved stories",
+        "Text view conveniently recreates the full story",
+        f"You feed Lyric, NewsBlur's hungry hound, for 6 days<img class='NB-feedchooser-premium-poor-hungry-dog' src='{settings.MEDIA_URL}img/reader/lyric.jpg'>",
+    ]
+    rand_int = (datetime.datetime.now().timetuple().tm_yday) % len(reasons)
     return {
         'user': user,
         'user_profile': user.profile,
         'social_profile': context['social_profile'],
         'feed_count': context['feed_count'],
+        'reason': reasons[rand_int],
+        'rand_int': rand_int+1
+    }
+    
+@register.inclusion_tag('reader/premium_archive_module.xhtml', takes_context=True)
+def render_premium_archive_module(context):
+    user    = get_user(context['user'])
+
+    reasons = [
+        "Stories can stay unread for however long you choose",
+        "Every story from every site is archived and searchable forever",
+        "Feeds that support paging are back-filled in for a complete archive",
+        "Export trained stories from folders as RSS feeds",
+        "Choose when stories are automatically marked as read",
+    ]
+    rand_int = (datetime.datetime.now().timetuple().tm_yday) % len(reasons)
+    
+    return {
+        'user': user,
+        'user_profile': user.profile,
+        'reason': reasons[rand_int],
+        'rand_int': rand_int+1+1
     }
     
 @register.inclusion_tag('reader/manage_module.xhtml', takes_context=True)
@@ -212,6 +250,44 @@ def commify(n):
         out += '.' + cents
     return out
 
+@register.simple_tag
+def settings_value(name):
+    return getattr(settings, name, "")
+
+@register.filter
+def smooth_timedelta(timedeltaobj):
+    """Convert a datetime.timedelta object into Days, Hours, Minutes, Seconds."""
+    if isinstance(timedeltaobj, datetime.datetime):
+        timedeltaobj = timedeltaobj - datetime.datetime.now()
+    secs = timedeltaobj.total_seconds()
+    overdue = secs < 0
+    secs = abs(secs)
+    timetot = ""
+    if not overdue:
+        timetot += "in "
+        
+    if secs > 86400: # 60sec * 60min * 24hrs
+        days = secs // 86400
+        timetot += "{} days".format(int(days))
+        secs = secs - days*86400
+
+    if secs > 3600:
+        hrs = secs // 3600
+        timetot += " {} hours".format(int(hrs))
+        secs = secs - hrs*3600
+
+    if secs > 60:
+        mins = secs // 60
+        timetot += " {} min".format(int(mins))
+        secs = secs - mins*60
+
+    if secs > 0:
+        timetot += " {} sec".format(int(secs))
+
+    if overdue:
+        timetot += " ago"
+    
+    return timetot
 
 @register.tag
 def include_javascripts(parser, token):
@@ -219,7 +295,42 @@ def include_javascripts(parser, token):
     return javascript(parser, token)
     # asset_type = 'javascripts'
     # return mark_safe(settings.JAMMIT.render_tags(asset_type, asset_package))
-        
+
+class RawJSNode(JavascriptNode):
+    def render(self, context):
+        output = super(RawJSNode, self).render(context)
+        path = re.search(r"src=\"/(.*?)\"", output)
+        assert path
+        filename = path.group(1)
+        abs_filename = os.path.join(settings.NEWSBLUR_DIR, filename)
+        f = open(abs_filename, 'r')
+        output = f.read()
+        return output
+    
+@register.tag
+def include_javascripts_raw(parser, token):
+    """Prints out the JS code found in the static asset packages."""
+    tag_name, name = token.split_contents()
+    scripts = RawJSNode(name)
+    return scripts
+
+class RawStylesheetNode(StylesheetNode):
+    def render(self, context):
+        output = super(RawStylesheetNode, self).render(context)
+        path = re.search(r"href=\"/(.*?)\"", output)
+        assert path
+        filename = path.group(1)
+        abs_filename = os.path.join(settings.NEWSBLUR_DIR, filename)
+        f = open(abs_filename, 'r')
+        output = f.read().replace('"', '\\"').replace('\n', '')
+        return output
+    
+@register.tag
+def include_stylesheets_raw(parser, token):
+    """Prints out the CSS code found in the static asset packages."""
+    tag_name, name = token.split_contents()
+    scripts = RawStylesheetNode(name)
+    return scripts
         
 @register.tag
 def include_stylesheets(parser, token):

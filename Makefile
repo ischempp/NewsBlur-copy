@@ -5,65 +5,65 @@ newsblur := $(shell docker ps -qf "name=newsblur_web")
 
 .PHONY: node
 
-#creates newsblur, but does not rebuild images or create keys
-start:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose up -d
+nb: pull bounce migrate bootstrap collectstatic
 
 metrics:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
-
-metrics-ps:
-	- RUNWITHMAKEBUILD=True docker-compose -f docker-compose.yml -f docker-compose.metrics.yml ps
-
-rebuild:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose down
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose up -d
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
 
 collectstatic: 
 	- rm -fr static
+	- docker pull newsblur/newsblur_deploy
 	- docker run --rm -v $(shell pwd):/srv/newsblur newsblur/newsblur_deploy
 
 #creates newsblur, builds new images, and creates/refreshes SSL keys
-nb: pull
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose down
+bounce:
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose down
 	- [[ -d config/certificates ]] && echo "keys exist" || make keys
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose up -d --build --remove-orphans
-	- RUNWITHMAKEBUILD=True docker-compose exec newsblur_web ./manage.py migrate
-	- RUNWITHMAKEBUILD=True docker-compose exec newsblur_web ./manage.py loaddata config/fixtures/bootstrap.json
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose up -d --build --remove-orphans
+
+bootstrap:
+	- docker exec newsblur_web ./manage.py loaddata config/fixtures/bootstrap.json
+
+nbup:
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose up -d --build --remove-orphans
 coffee:
 	- coffee -c -w **/*.coffee
-
+migrations:
+	- docker exec -it newsblur_web ./manage.py makemigrations
+makemigration: migrations
+datamigration: 
+	- docker exec -it newsblur_web ./manage.py makemigrations --empty $(app)
+migration: migrations
+migrate:
+	- docker exec -it newsblur_web ./manage.py migrate
 shell:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose exec newsblur_web ./manage.py shell_plus
+	- docker exec -it newsblur_web ./manage.py shell_plus
 bash:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose exec newsblur_web bash
+	- docker exec -it newsblur_web bash
 # allows user to exec into newsblur_web and use pdb.
 debug:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker attach ${newsblur}
+	- docker attach ${newsblur}
 log:
-	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20 newsblur_web newsblur_node
-containerkill:
-	- RUNWITHMAKEBUILD=True docker-compose kill ${container}
-containerlog:
-	- RUNWITHMAKEBUILD=True docker-compose logs -f ${container}
-containerbash:
-	- RUNWITHMAKEBUILD=True docker-compose exec ${container} bash
-ps:
-	- RUNWITHMAKEBUILD=True docker-compose ps
-
-	
+	- RUNWITHMAKEBUILD=True docker compose logs -f --tail 20 newsblur_web newsblur_node
 logweb: log
 logcelery:
-	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20 task_celery
+	- RUNWITHMAKEBUILD=True docker compose logs -f --tail 20 task_celery
 logtask: logcelery
 logmongo:
-	- RUNWITHMAKEBUILD=True docker-compose logs -f db_mongo
+	- RUNWITHMAKEBUILD=True docker compose logs -f db_mongo
 alllogs: 
-	- RUNWITHMAKEBUILD=True docker-compose logs -f --tail 20
+	- RUNWITHMAKEBUILD=True docker compose logs -f --tail 20
 logall: alllogs
-# brings down containers
+mongo:
+	- docker exec -it db_mongo mongo --port 29019
+redis:
+	- docker exec -it db_redis redis-cli -p 6579
+postgres:
+	- docker exec -it db_postgres psql -U newsblur
+stripe:
+	- stripe listen --forward-to localhost/zebra/webhooks/v2/
 down:
-	- RUNWITHMAKEBUILD=True docker-compose -f docker-compose.yml -f docker-compose.metrics.yml down
+	- RUNWITHMAKEBUILD=True docker compose -f docker-compose.yml -f docker-compose.metrics.yml down
 nbdown: down
 jekyll:
 	- cd blog && bundle exec jekyll serve
@@ -72,18 +72,29 @@ jekyll_drafts:
 
 # runs tests
 test:
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} TEST=True docker-compose -f docker-compose.yml up -d newsblur_web
-	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker-compose exec newsblur_web bash -c "python3 manage.py test apps -v 3 --failfast"
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} TEST=True docker compose -f docker-compose.yml up -d newsblur_web
+	- RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose exec newsblur_web bash -c "python3 manage.py test apps -v 3 --failfast"
+# - RUNWITHMAKEBUILD=True CURRENT_UID=${CURRENT_UID} CURRENT_GID=${CURRENT_GID} docker compose exec newsblur_web bash -c "NOSE_EXCLUDE_DIRS=./vendor DJANGO_SETTINGS_MODULE=newsblur_web.test_settings python3 manage.py test -v 3 --failfast"
 
 keys:
 	- mkdir config/certificates
 	- openssl dhparam -out config/certificates/dhparam-2048.pem 2048
 	- openssl req -x509 -nodes -new -sha256 -days 1024 -newkey rsa:2048 -keyout config/certificates/RootCA.key -out config/certificates/RootCA.pem -subj "/C=US/CN=Example-Root-CA"
 	- openssl x509 -outform pem -in config/certificates/RootCA.pem -out config/certificates/RootCA.crt
-	- openssl req -new -nodes -newkey rsa:2048 -keyout config/certificates/localhost.key -out config/certificates/localhost.csr -subj "/C=US/ST=YourState/L=YourCity/O=Example-Certificates/CN=localhost.local"
+	- openssl req -new -nodes -newkey rsa:2048 -keyout config/certificates/localhost.key -out config/certificates/localhost.csr -subj "/C=US/ST=YourState/L=YourCity/O=Example-Certificates/CN=localhost"
 	- openssl x509 -req -sha256 -days 1024 -in config/certificates/localhost.csr -CA config/certificates/RootCA.pem -CAkey config/certificates/RootCA.key -CAcreateserial -out config/certificates/localhost.crt
 	- cat config/certificates/localhost.crt config/certificates/localhost.key > config/certificates/localhost.pem
-	- /usr/bin/security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain ./config/certificates/RootCA.crt
+	- sudo /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./config/certificates/RootCA.crt
+
+# Doesn't work yet
+mkcert:
+	- mkdir config/mkcert
+	- docker run -v $(shell pwd)/config/mkcert:/root/.local/share/mkcert brunopadz/mkcert-docker:latest \
+		/bin/sh -c "mkcert -install && \
+		mkcert -cert-file /root/.local/share/mkcert/mkcert.pem \
+		-key-file /root/.local/share/mkcert/mkcert.key localhost"
+	- cat config/mkcert/rootCA.pem config/mkcert/rootCA-key.pem > config/certificates/localhost.pem
+	- sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ./config/mkcert/rootCA.pem
 
 # Digital Ocean / Terraform
 list:
@@ -112,6 +123,9 @@ pull:
 	- docker pull newsblur/newsblur_node
 	- docker pull newsblur/newsblur_monitor
 
+local_build_web:
+	# - docker buildx build --load . --file=docker/newsblur_base_image.Dockerfile --tag=newsblur/newsblur_python3
+	- docker build . --file=docker/newsblur_base_image.Dockerfile --tag=newsblur/newsblur_python3
 build_web:
 	- docker buildx build . --platform linux/amd64,linux/arm64 --file=docker/newsblur_base_image.Dockerfile --tag=newsblur/newsblur_python3
 build_node: 
@@ -130,7 +144,7 @@ push_monitor:
 push_deploy:
 	- docker buildx build . --push --platform linux/amd64,linux/arm64 --file=docker/newsblur_deploy.Dockerfile --tag=newsblur/newsblur_deploy
 push_images: push_web push_node push_monitor push_deploy
-push: build push_images
+push: push_images
 
 # Tasks
 deploy_web:
@@ -147,8 +161,9 @@ node: deploy_node
 deploy_task:
 	- ansible-playbook ansible/deploy.yml -l task
 task: deploy_task
+celery: deploy_task
 deploy_www:
-	- ansible-playbook ansible/deploy.yml -l www
+	- ansible-playbook ansible/deploy.yml -l haproxy
 www: deploy_www
 deploy_work:
 	- ansible-playbook ansible/deploy.yml -l work
@@ -161,6 +176,8 @@ deploy_staging:
 staging: deploy_staging
 celery_stop:
 	- ansible-playbook ansible/deploy.yml -l task --tags stop
+sentry:
+	- ansible-playbook ansible/setup.yml -l sentry -t sentry
 maintenance_on:
 	- ansible-playbook ansible/deploy.yml -l web --tags maintenance_on
 maintenance_off:
@@ -173,7 +190,14 @@ oldfirewall:
 	- ANSIBLE_CONFIG=/srv/newsblur/ansible.old.cfg ansible-playbook ansible/all.yml  -l db --tags firewall
 repairmongo:
 	- sudo docker run -v "/srv/newsblur/docker/volumes/db_mongo:/data/db" mongo:4.0 mongod --repair --dbpath /data/db
-
+mongodump:
+	- docker exec -it db_mongo mongodump --port 29019 -d newsblur -o /data/mongodump
+	- cp -fr docker/volumes/db_mongo/mongodump docker/volumes/mongodump
+# - docker exec -it db_mongo cp -fr /data/db/mongodump /data/mongodump
+# - docker exec -it db_mongo rm -fr /data/db/
+mongorestore:
+	- cp -fr docker/volumes/mongodump docker/volumes/db_mongo/
+	- docker exec -it db_mongo mongorestore --port 29019 -d newsblur /data/db/mongodump/newsblur
 
 # performance tests
 perf-cli:

@@ -1,5 +1,5 @@
 global:
-    scrape_interval: 5s
+    scrape_interval: 30s
 scrape_configs:
     - job_name: 'node_exporter'
       consul_sd_configs:
@@ -65,6 +65,11 @@ scrape_configs:
         - targets: ['{{ monitor_server }}']
       metrics_path: /monitor/errors
       scheme: https
+    - job_name: 'feed_sizes'
+      static_configs:
+        - targets: ['{{ monitor_server }}']
+      metrics_path: /monitor/feed-sizes
+      scheme: https
     - job_name: 'feed_counts'
       static_configs:
         - targets: ['{{ monitor_server }}']
@@ -114,6 +119,11 @@ scrape_configs:
       static_configs:
         - targets: ['{{ monitor_server }}']
       metrics_path: /monitor/users
+      scheme: https
+    - job_name: 'django'
+      static_configs:
+        - targets: ['{{ monitor_server }}']
+      metrics_path: /metrics
       scheme: https
 
     #- job_name: 'mongo heap usage'

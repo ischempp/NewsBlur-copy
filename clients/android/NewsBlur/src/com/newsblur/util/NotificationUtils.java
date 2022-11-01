@@ -16,6 +16,7 @@ import androidx.core.app.NotificationManagerCompat;
 import com.newsblur.R;
 import com.newsblur.activity.FeedReading;
 import com.newsblur.activity.Reading;
+import com.newsblur.database.BlurDatabaseHelper;
 import com.newsblur.database.DatabaseConstants;
 import com.newsblur.domain.Story;
 
@@ -30,8 +31,7 @@ public class NotificationUtils {
      * @param storiesFocus a cursor of unread, focus stories to notify, ordered newest to oldest
      * @param storiesUnread a cursor of unread, neutral stories to notify, ordered newest to oldest
      */
-    public static synchronized void notifyStories(Cursor storiesFocus, Cursor storiesUnread, Context context, FileCache iconCache) {
-        FeedUtils.offerInitContext(context);
+    public static synchronized void notifyStories(Context context, Cursor storiesFocus, Cursor storiesUnread, FileCache iconCache, BlurDatabaseHelper dbHelper) {
         NotificationManagerCompat nm = NotificationManagerCompat.from(context);
 
         int count = 0;
@@ -41,12 +41,12 @@ public class NotificationUtils {
                 nm.cancel(story.hashCode());
                 continue;
             }
-            if (FeedUtils.dbHelper.isStoryDismissed(story.storyHash)) {
+            if (dbHelper.isStoryDismissed(story.storyHash)) {
                 nm.cancel(story.hashCode());
                 continue;
             }
             if (StoryUtils.hasOldTimestamp(story.timestamp)) {
-                FeedUtils.dbHelper.putStoryDismissed(story.storyHash);
+                dbHelper.putStoryDismissed(story.storyHash);
                 nm.cancel(story.hashCode());
                 continue;
             }
@@ -55,7 +55,7 @@ public class NotificationUtils {
                 nm.notify(story.hashCode(), n);
             } else {
                 nm.cancel(story.hashCode());
-                FeedUtils.dbHelper.putStoryDismissed(story.storyHash);
+                dbHelper.putStoryDismissed(story.storyHash);
             }
             count++;
         }
@@ -65,12 +65,12 @@ public class NotificationUtils {
                 nm.cancel(story.hashCode());
                 continue;
             }
-            if (FeedUtils.dbHelper.isStoryDismissed(story.storyHash)) {
+            if (dbHelper.isStoryDismissed(story.storyHash)) {
                 nm.cancel(story.hashCode());
                 continue;
             }
             if (StoryUtils.hasOldTimestamp(story.timestamp)) {
-                FeedUtils.dbHelper.putStoryDismissed(story.storyHash);
+                dbHelper.putStoryDismissed(story.storyHash);
                 nm.cancel(story.hashCode());
                 continue;
             }
@@ -79,7 +79,7 @@ public class NotificationUtils {
                 nm.notify(story.hashCode(), n);
             } else {
                 nm.cancel(story.hashCode());
-                FeedUtils.dbHelper.putStoryDismissed(story.storyHash);
+                dbHelper.putStoryDismissed(story.storyHash);
             }
             count++;
         }
@@ -114,19 +114,23 @@ public class NotificationUtils {
         // UI on some devices.
         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         // set the requestCode to the story hashcode to prevent the PI re-using the wrong Intent
-        PendingIntent pendingIntent = PendingIntent.getActivity(context, story.hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = PendingIntentUtils.getImmutableActivity(context, story.hashCode(), i, PendingIntent.FLAG_UPDATE_CURRENT);
 
         Intent dismissIntent = new Intent(context, NotifyDismissReceiver.class);
         dismissIntent.putExtra(Reading.EXTRA_STORY_HASH, story.storyHash);
-        PendingIntent dismissPendingIntent = PendingIntent.getBroadcast(context.getApplicationContext(), story.hashCode(), dismissIntent, 0);
+        PendingIntent dismissPendingIntent = PendingIntentUtils.getImmutableBroadcast(context.getApplicationContext(), story.hashCode(), dismissIntent, 0);
 
         Intent saveIntent = new Intent(context, NotifySaveReceiver.class);
         saveIntent.putExtra(Reading.EXTRA_STORY_HASH, story.storyHash);
-        PendingIntent savePendingIntent = PendingIntent.getBroadcast(context.getApplicationContext(), story.hashCode(), saveIntent, 0);
+        PendingIntent savePendingIntent = PendingIntentUtils.getImmutableBroadcast(context.getApplicationContext(), story.hashCode(), saveIntent, 0);
 
         Intent markreadIntent = new Intent(context, NotifyMarkreadReceiver.class);
         markreadIntent.putExtra(Reading.EXTRA_STORY_HASH, story.storyHash);
-        PendingIntent markreadPendingIntent = PendingIntent.getBroadcast(context.getApplicationContext(), story.hashCode(), markreadIntent, 0);
+        PendingIntent markreadPendingIntent = PendingIntentUtils.getImmutableBroadcast(context.getApplicationContext(), story.hashCode(), markreadIntent, 0);
+
+        Intent shareIntent = new Intent(context, NotifyShareReceiver.class);
+        shareIntent.putExtra(Reading.EXTRA_STORY, story);
+        PendingIntent sharePendingIntent = PendingIntentUtils.getImmutableBroadcast(context.getApplicationContext(), story.hashCode(), shareIntent, 0);
 
         String feedTitle = cursor.getString(cursor.getColumnIndex(DatabaseConstants.FEED_TITLE));
         StringBuilder title = new StringBuilder();
@@ -144,8 +148,9 @@ public class NotificationUtils {
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setWhen(story.timestamp)
-            .addAction(0, "Save", savePendingIntent)
             .addAction(0, "Mark Read", markreadPendingIntent)
+            .addAction(0, "Save", savePendingIntent)
+            .addAction(0, "Share", sharePendingIntent)
             .setColor(NOTIFY_COLOUR);
         if (feedIcon != null) {
             nb.setLargeIcon(feedIcon);

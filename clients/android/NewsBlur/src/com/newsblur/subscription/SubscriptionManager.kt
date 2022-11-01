@@ -21,6 +21,10 @@ import com.newsblur.util.Log
 import com.newsblur.util.NBScope
 import com.newsblur.util.PrefsUtils
 import com.newsblur.util.executeAsyncTask
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -58,7 +62,7 @@ interface SubscriptionManager {
     /**
      * Sync subscription state between NewsBlur and Play Store.
      */
-    fun syncActiveSubscription(): Job
+    suspend fun syncActiveSubscription(): Job
 
     /**
      * Notify backend of active Play Store subscription.
@@ -70,13 +74,20 @@ interface SubscriptionManager {
 
 interface SubscriptionsListener {
 
-    fun onActiveSubscription(renewalMessage: String?)
+    fun onActiveSubscription(renewalMessage: String?) {}
 
-    fun onAvailableSubscription(skuDetails: SkuDetails)
+    fun onAvailableSubscription(skuDetails: SkuDetails) {}
 
-    fun onBillingConnectionReady()
+    fun onBillingConnectionReady() {}
 
-    fun onBillingConnectionError(message: String? = null)
+    fun onBillingConnectionError(message: String? = null) {}
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface SubscriptionManagerEntryPoint {
+
+    fun apiManager(): APIManager
 }
 
 class SubscriptionManagerImpl(
@@ -90,7 +101,9 @@ class SubscriptionManagerImpl(
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
                 Log.d(this, "acknowledgePurchaseResponseListener OK")
-                syncActiveSubscription()
+                scope.launch(Dispatchers.Default) {
+                    syncActiveSubscription()
+                }
             }
             BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
                 // Billing API version is not supported for the type requested.
@@ -174,7 +187,7 @@ class SubscriptionManagerImpl(
         billingClient.launchBillingFlow(activity, billingFlowParams)
     }
 
-    override fun syncActiveSubscription() = scope.launch(Dispatchers.Default) {
+    override suspend fun syncActiveSubscription() = scope.launch(Dispatchers.Default) {
         val hasNewsBlurSubscription = PrefsUtils.getIsPremium(context)
         val activePlayStoreSubscription = getActiveSubscriptionAsync().await()
 
@@ -197,10 +210,11 @@ class SubscriptionManagerImpl(
 
     override fun saveReceipt(purchase: Purchase) {
         Log.d(this, "saveReceipt: ${purchase.orderId}")
-        val apiManager = APIManager(context)
+        val hiltEntryPoint = EntryPointAccessors
+                .fromApplication(context.applicationContext, SubscriptionManagerEntryPoint::class.java)
         scope.executeAsyncTask(
                 doInBackground = {
-                    apiManager.saveReceipt(purchase.orderId, purchase.skus.first())
+                    hiltEntryPoint.apiManager().saveReceipt(purchase.orderId, purchase.skus.first())
                 },
                 onPostExecute = {
                     if (!it.isError) {
@@ -258,7 +272,9 @@ class SubscriptionManagerImpl(
     private fun handlePurchase(purchase: Purchase) {
         Log.d(this, "handlePurchase: ${purchase.orderId}")
         if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && purchase.isAcknowledged) {
-            syncActiveSubscription()
+            scope.launch(Dispatchers.Default) {
+                syncActiveSubscription()
+            }
         } else if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
             // need to acknowledge first time sub otherwise it will void
             Log.d(this, "acknowledge purchase: ${purchase.orderId}")

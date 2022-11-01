@@ -12,6 +12,7 @@ ADMINS                = (
 SERVER_EMAIL          = 'server@newsblur.com'
 HELLO_EMAIL           = 'hello@newsblur.com'
 NEWSBLUR_URL          = 'https://localhost'
+PUSH_DOMAIN           = 'localhost'
 SESSION_COOKIE_DOMAIN = 'localhost'
 
 # ===================
@@ -25,7 +26,7 @@ DEBUG = False
 # DEBUG_ASSETS controls JS/CSS asset packaging. Turning this off requires you to run 
 # `./manage.py collectstatic` first. Turn this on for development so you can see
 # changes in your JS/CSS. 
-DEBUG_ASSETS = False # Make sure to run `./manage.py collectstatic` first
+DEBUG_ASSETS = False  # Make sure to run `./manage.py collectstatic` first
 DEBUG_ASSETS = True
 
 # DEBUG_QUERIES controls the output of the database query logs. Can be rather verbose
@@ -33,22 +34,32 @@ DEBUG_ASSETS = True
 # down verbosity.
 DEBUG_QUERIES = DEBUG
 DEBUG_QUERIES_SUMMARY_ONLY = True
+# DEBUG_QUERIES_SUMMARY_ONLY = False
 
 MEDIA_URL = '/media/'
 IMAGES_URL = '/imageproxy'
+# Uncomment below to debug iOS/Android widget
+# IMAGES_URL = 'https://haproxy/imageproxy'
 SECRET_KEY = 'YOUR SECRET KEY'
 AUTO_PREMIUM_NEW_USERS = True
+AUTO_PREMIUM_ARCHIVE_NEW_USERS = True
+AUTO_PREMIUM_PRO_NEW_USERS = True
+AUTO_PREMIUM = True
+# AUTO_PREMIUM = False
+if not AUTO_PREMIUM:
+    AUTO_PREMIUM_NEW_USERS = False
+    AUTO_PREMIUM_ARCHIVE_NEW_USERS = False
+    AUTO_PREMIUM_PRO_NEW_USERS = False
 AUTO_ENABLE_NEW_USERS = True
 ENFORCE_SIGNUP_CAPTCHA = False
+ENABLE_PUSH = False
+
+PRO_MINUTES_BETWEEN_FETCHES = 15
 
 CACHES = {
     'default': {
-        'BACKEND': 'redis_cache.RedisCache',
-        'LOCATION': 'db_redis:6579',
-        'OPTIONS': {
-            'DB': 6,
-            'PARSER_CLASS': 'redis.connection.HiredisParser'
-        },
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://db_redis:6579/6',
     },
 }
 
@@ -63,9 +74,10 @@ OAUTH_SECRET = 'SECRET_KEY_FROM_GOOGLE'
 
 S3_ACCESS_KEY = 'XXX'
 S3_SECRET = 'SECRET'
-S3_BACKUP_BUCKET = 'newsblur_backups'
+S3_BACKUP_BUCKET = 'newsblur-backups'
 S3_PAGES_BUCKET_NAME = 'pages-XXX.newsblur.com'
 S3_ICONS_BUCKET_NAME = 'icons-XXX.newsblur.com'
+S3_AVATARS_BUCKET_NAME = 'avatars-XXX.newsblur.com'
 
 STRIPE_SECRET = "YOUR-SECRET-API-KEY"
 STRIPE_PUBLISHABLE = "YOUR-PUBLISHABLE-API-KEY"
@@ -87,7 +99,7 @@ YOUTUBE_API_KEY = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 DATABASES = {
     'default': {
         'NAME': 'newsblur',
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django_prometheus.db.backends.postgresql',
         #'ENGINE': 'django.db.backends.mysql',
         'USER': 'newsblur',
         'PASSWORD': 'newsblur',
@@ -160,13 +172,6 @@ if len(logging._handlerList) < 1:
                             format='%(asctime)-12s: %(message)s',
                             datefmt='%b %d %H:%M:%S',
                             handler=logging.StreamHandler)
-
-S3_ACCESS_KEY = '000000000000000000000'
-S3_SECRET = '000000000000000000000000/0000000000000000'
-S3_BACKUP_BUCKET = 'newsblur_backups'
-S3_PAGES_BUCKET_NAME = 'pages-dev.newsblur.com'
-S3_ICONS_BUCKET_NAME = 'icons-dev.newsblur.com'
-S3_AVATARS_BUCKET_NAME = 'avatars-dev.newsblur.com'
 
 MAILGUN_ACCESS_KEY = 'key-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 MAILGUN_SERVER_NAME = 'newsblur.com'

@@ -7,30 +7,32 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ImageView;
 
+import com.newsblur.R;
 import com.newsblur.activity.Profile;
 import com.newsblur.view.FlowLayout;
-import com.newsblur.view.RoundedImageView;
 
 public class ViewUtils {
 
     private ViewUtils() {} // util class - no instances
 
-	public static ImageView createSharebarImage(final Context context, final String photoUrl, final String userId) {
-		RoundedImageView image = new RoundedImageView(context);
+	public static ImageView createSharebarImage(final Context context, final String photoUrl, final String userId, ImageLoader iconLoader) {
+		ImageView image = new ImageView(context);
 		int imageLength = UIUtils.dp2px(context, 15);
 		image.setMaxHeight(imageLength);
 		image.setMaxWidth(imageLength);
-		
+		image.setClipToOutline(true);
+		image.setBackgroundResource(R.drawable.shape_rounded_corners_4dp);
+
 		FlowLayout.LayoutParams imageParameters = new FlowLayout.LayoutParams(5, 5);
-		
+
 		imageParameters.height = imageLength;
 		imageParameters.width = imageLength;
-		
+
 		image.setMaxHeight(imageLength);
 		image.setMaxWidth(imageLength);
-		
+
 		image.setLayoutParams(imageParameters);
-		FeedUtils.iconLoader.displayImage(photoUrl, image);
+		iconLoader.displayImage(photoUrl, image);
 		image.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View view) {

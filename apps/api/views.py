@@ -125,10 +125,11 @@ def add_site_load_script(request, token):
 
 def add_site(request, token):
     code       = 0
-    url        = request.GET['url']
-    folder     = request.GET['folder']
-    new_folder = request.GET.get('new_folder')
-    callback   = request.GET.get('callback', '')
+    get_post   = getattr(request, request.method)
+    url        = get_post.get('url')
+    folder     = get_post.get('folder')
+    new_folder = get_post.get('new_folder')
+    callback   = get_post.get('callback', '')
     
     if not url:
         code = -1
@@ -217,6 +218,10 @@ def check_share_on_site(request, token):
     
     logging.user(request.user, "~FBFinding feed (check_share_on_site): %s" % rss_url)
     feed = Feed.get_feed_from_url(rss_url, create=False, fetch=False)
+    if not feed:
+        rss_url = urllib.parse.urljoin(story_url, rss_url)
+        logging.user(request.user, "~FBFinding feed (check_share_on_site): %s" % rss_url)
+        feed = Feed.get_feed_from_url(rss_url, create=False, fetch=False)
     if not feed:
         logging.user(request.user, "~FBFinding feed (check_share_on_site): %s" % story_url)
         feed = Feed.get_feed_from_url(story_url, create=False, fetch=False)

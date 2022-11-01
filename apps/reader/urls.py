@@ -5,6 +5,7 @@ urlpatterns = [
     url(r'^$', views.index),
     url(r'^buster', views.iframe_buster, name='iframe-buster'),
     url(r'^login_as', views.login_as, name='login_as'),
+    url(r'^welcome', views.welcome_req, name='welcome'),
     url(r'^logout', views.logout, name='welcome-logout'),
     url(r'^login', views.login, name='welcome-login'),
     url(r'^autologin/(?P<username>\w+)/(?P<secret>\w+)/?', views.autologin, name='autologin'),
@@ -14,6 +15,7 @@ urlpatterns = [
     url(r'^page/(?P<feed_id>\d+)', views.load_feed_page, name='load-feed-page'),
     url(r'^refresh_feed/(?P<feed_id>\d+)', views.refresh_feed, name='refresh-feed'),
     url(r'^favicons', views.load_feed_favicons, name='load-feed-favicons'),
+    url(r'^river_stories_widget', views.load_river_stories_widget, name='load-river-stories-widget'),
     url(r'^river_stories', views.load_river_stories__redis, name='load-river-stories'),
     url(r'^complete_river', views.complete_river, name='complete-river'),
     url(r'^refresh_feeds', views.refresh_feeds, name='refresh-feeds'),
@@ -62,4 +64,5 @@ urlpatterns = [
     url(r'^save_search', views.save_search, name='save-search'),
     url(r'^delete_search', views.delete_search, name='delete-search'),
     url(r'^save_dashboard_river', views.save_dashboard_river, name='save-dashboard-river'),
+    url(r'^remove_dashboard_river', views.remove_dashboard_river, name='remove-dashboard-river'),
 ]

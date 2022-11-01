@@ -148,7 +148,7 @@ class EmailNewsletter:
                                          from_email='NewsBlur <%s>' % settings.HELLO_EMAIL,
                                          to=['%s <%s>' % (user, user.email)])
         msg.attach_alternative(html, "text/html")
-        msg.send(fail_silently=True)
+        msg.send()
         
         logging.user(user, "~BB~FM~SBSending first newsletter email to: %s" % user.email)
         
@@ -192,6 +192,9 @@ class EmailNewsletter:
             return params['stripped-html']
         if 'body-plain' in params:
             return linkify(linebreaks(params['body-plain']))
+        
+        if force_plain:
+            return self._get_content(params, force_plain=False)
     
     def _clean_content(self, content):
         original = content

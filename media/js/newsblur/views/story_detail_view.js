@@ -121,12 +121,19 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
 
     attach_handlers: function() {
         this.watch_images_for_story_height();
-        this.attach_audio_handler();
         this.attach_syntax_highlighter_handler();
         this.attach_fitvid_handler();
         this.render_starred_tags();
         this.apply_starred_story_selections();
         this.watch_images_load();
+        this.attach_custom_handler();
+    },
+    
+    attach_custom_handler: function () {
+        // Use this to create your own story_content handler.
+        // Add this to your Manage > Account > Custom CSS:
+        // 
+        // NEWSBLUR.Views.StoryDetailView.prototype.attach_custom_handler = () => { console.log(['Story selected', NEWSBLUR.reader.active_story.get('story_title'), NEWSBLUR.reader.active_story.get('story_content').length + " bytes"]); }
     },
     
     watch_images_load: function () {
@@ -153,8 +160,17 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
                     largest = this.width;
                     $largest = $(this);
                 }
-                $(this).removeClass('NB-large-image').removeClass('NB-medium-image').removeClass('NB-small-image');
-                if (pane_width >= 900) return;
+                $(this)
+                    .removeClass('NB-large-image')
+                    .removeClass('NB-large-image-widen')
+                    .removeClass('NB-medium-image')
+                    .removeClass('NB-medium-image-widen')
+                    .removeClass('NB-small-image')
+                    .removeClass('NB-small-image-widen');
+                var auto_widen = true;
+                if (pane_width >= 900) {
+                    auto_widen = false;
+                }
 
                 if (has_tables) {
                     // Can't even calculate widths because with tables, nothing fits
@@ -162,10 +178,19 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
                 }
                 if (this.naturalWidth >= pane_width && this.naturalHeight >= 50) {
                     $(this).addClass('NB-large-image');
+                    if (auto_widen) {
+                        $(this).addClass('NB-large-image-widen');
+                    }
                 } else if (this.naturalWidth >= 100 && this.naturalHeight >= 50) {
                     $(this).addClass('NB-medium-image');
+                    if (auto_widen) {
+                        $(this).addClass('NB-medium-image-widen');
+                    }
                 } else {
                     $(this).addClass('NB-small-image');
+                    if (auto_widen) {
+                        $(this).addClass('NB-small-image-widen');
+                    }
                 }
             });
             if ($largest) {
@@ -250,7 +275,10 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
                     <% } %>\
                 </div>\
                 <% if (story.get("starred_date")) { %>\
-                    <span class="NB-feed-story-starred-date"><%= story.get("starred_date") %></span>\
+                    <div class="NB-feed-story-starred-date">\
+                        <span class="NB-icon">Saved: </span>\
+                        <%= story.get("starred_date") %>\
+                    </div >\
                 <% } %>\
             </div>\
         </div>\
@@ -278,20 +306,20 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
             <div class="NB-feed-story-sideoptions-container">\
                 <div class="NB-sideoption NB-feed-story-email" role="button">\
                     <div class="NB-sideoption-icon">&nbsp;</div>\
-                    <div class="NB-sideoption-title">Email <span>this story</span></div>\
+                    <div class="NB-sideoption-title">Email</div>\
                 </div>\
                 <div class="NB-sideoption NB-feed-story-train" role="button">\
                     <div class="NB-sideoption-icon">&nbsp;</div>\
-                    <div class="NB-sideoption-title">Train <span>this story</span></div>\
+                    <div class="NB-sideoption-title">Train</div>\
                 </div>\
                 <div class="NB-sideoption NB-feed-story-save" role="button">\
                     <div class="NB-sideoption-icon">&nbsp;</div>\
-                    <div class="NB-sideoption-title"><%= story.get("starred") ? "Saved" : "Save <span>this story</span>" %></div>\
+                    <div class="NB-sideoption-title"><%= story.get("starred") ? "Saved" : "Save" %></div>\
                 </div>\
                 <%= story_save_view %>\
                 <div class="NB-sideoption NB-feed-story-share" role="button">\
                     <div class="NB-sideoption-icon">&nbsp;</div>\
-                    <div class="NB-sideoption-title"><%= story.get("shared") ? "Shared" : "Share <span>this story</span>" %></div>\
+                    <div class="NB-sideoption-title"><%= story.get("shared") ? "Shared" : "Share" %></div>\
                 </div>\
                 <%= story_share_view %>\
             </div>\
@@ -314,8 +342,8 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
         }
         $header.css('background-image', NEWSBLUR.utils.generate_gradient(this.feed, 'webkit'));
         $header.css('background-image', NEWSBLUR.utils.generate_gradient(this.feed, 'moz'));
-        $header.css('borderTop',        NEWSBLUR.utils.generate_gradient(this.feed, 'border'));
-        $header.css('borderBottom',     NEWSBLUR.utils.generate_gradient(this.feed, 'border'));
+        // $header.css('borderTop',        NEWSBLUR.utils.generate_gradient(this.feed, 'border'));
+        // $header.css('borderBottom',     NEWSBLUR.utils.generate_gradient(this.feed, 'border'));
         $header.css('textShadow',       NEWSBLUR.utils.generate_shadow(this.feed));
     },
     
@@ -619,29 +647,11 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
             $sideoption_title.one('mouseleave', function() {
                 _.delay(function() {
                     if (!story.get('starred')) {
-                        $sideoption_title.text('Save this story');
+                        $sideoption_title.text('Save');
                     }
                 }, 200);
             });        
         }
-    },
-    
-    attach_audio_handler: function() {
-        _.delay(_.bind(function() {
-            var $audio = this.$('audio').filter(function() {
-                return !$(this).closest('.audiojs').length;
-            });
-
-            var audio_opts = window.a = {
-                imageLocation: NEWSBLUR.Globals.MEDIA_URL + 'img/reader/player-graphics.gif',
-                swfLocation: NEWSBLUR.Globals.MEDIA_URL + 'flash/audiojs.swf',
-                preload: false
-            };
-
-            audiojs.events.ready(function() {
-                audiojs.createAll(audio_opts, $audio);
-            });
-        }, this), 500);
     },
     
     attach_syntax_highlighter_handler: function() {
@@ -690,7 +700,7 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
                 href = footnote_href;
                 var offset = $(href).offset().top;
                 var $scroll;
-                if (_.contains(['list', 'grid'], NEWSBLUR.assets.view_setting(NEWSBLUR.reader.active_feed, 'layout'))) {
+                if (_.contains(['list', 'grid', 'magazine'], NEWSBLUR.assets.view_setting(NEWSBLUR.reader.active_feed, 'layout'))) {
                     $scroll = NEWSBLUR.reader.$s.$story_titles;
                 } else if (NEWSBLUR.reader.flags['temporary_story_view'] || 
                     NEWSBLUR.reader.story_view == 'text') {
@@ -998,7 +1008,7 @@ NEWSBLUR.Views.StoryDetailView = Backbone.View.extend({
     },
     
     scroll_to_comments: function() {
-        if (_.contains(['list', 'grid'], NEWSBLUR.assets.view_setting(NEWSBLUR.reader.active_feed, 'layout'))) {
+        if (_.contains(['list', 'grid', 'magazine'], NEWSBLUR.assets.view_setting(NEWSBLUR.reader.active_feed, 'layout'))) {
             NEWSBLUR.app.story_titles.scroll_to_selected_story(this.model, {
                 scroll_to_comments: true,
                 scroll_offset: -50

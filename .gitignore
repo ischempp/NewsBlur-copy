@@ -19,6 +19,7 @@ certbot.conf
 task_env.py
 app_env.py
 data/
+.prom_cache
 config/certificates
 **/*.xcuserstate
 UserInterfaceState.xcuserstate
@@ -40,10 +41,10 @@ media/css/circular
 config/settings
 config/secrets
 templates/maintenance_on.html
-vendor/mms-agent/settings.py
 apps/social/spam.py
 venv*
-/backups
+backup
+backups
 config/mongodb_keyfile.key
 
 # Docker Jinja templates

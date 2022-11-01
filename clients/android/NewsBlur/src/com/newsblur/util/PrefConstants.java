@@ -63,6 +63,8 @@ public class PrefConstants {
     public static final String STORIES_MARK_READ_ON_SCROLL = "pref_mark_read_on_scroll";
     public static final String STORIES_SHOW_PREVIEWS_STYLE = "pref_show_content_preview_style";
     public static final String STORIES_THUMBNAIL_STYLE = "pref_thumbnail_style";
+    public static final String STORY_MARK_READ_BEHAVIOR = "pref_story_mark_read_behavior";
+    public static final String SPACING_STYLE = "pref_spacing_style";
 
     public static final String ENABLE_OFFLINE = "enable_offline";
     public static final String ENABLE_IMAGE_PREFETCH = "enable_image_prefetch";
@@ -121,4 +123,5 @@ public class PrefConstants {
     public static final String FEED_CHOOSER_FOLDER_VIEW = "feed_chooser_folder_view";
     public static final String WIDGET_BACKGROUND = "widget_background";
     public static final String IN_APP_REVIEW = "in_app_review";
+    public static final String LOAD_NEXT_ON_MARK_READ = "load_next_on_mark_read";
 }

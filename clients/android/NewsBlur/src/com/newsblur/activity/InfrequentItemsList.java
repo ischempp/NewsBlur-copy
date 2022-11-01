@@ -6,7 +6,6 @@ import android.view.MenuItem;
 import com.newsblur.R;
 import com.newsblur.fragment.InfrequentCutoffDialogFragment;
 import com.newsblur.fragment.InfrequentCutoffDialogFragment.InfrequentCutoffChangedListener;
-import com.newsblur.util.FeedUtils;
 import com.newsblur.util.PrefsUtils;
 import com.newsblur.util.UIUtils;
 
@@ -16,7 +15,7 @@ public class InfrequentItemsList extends ItemsList implements InfrequentCutoffCh
 	protected void onCreate(Bundle bundle) {
 		super.onCreate(bundle);
 
-        UIUtils.setupToolbar(this, R.drawable.ak_icon_allstories, getResources().getString(R.string.infrequent_title), false);
+        UIUtils.setupToolbar(this, R.drawable.ak_icon_infrequent, getResources().getString(R.string.infrequent_title), false);
 	}
 
     @Override
@@ -33,7 +32,7 @@ public class InfrequentItemsList extends ItemsList implements InfrequentCutoffCh
     @Override
     public void infrequentCutoffChanged(int newValue) {
         PrefsUtils.setInfrequentCutoff(this, newValue);
-        FeedUtils.dbHelper.clearInfrequentSession();
+        dbHelper.clearInfrequentSession();
         restartReadingSession();
     }
 
