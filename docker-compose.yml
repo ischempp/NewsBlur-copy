@@ -8,7 +8,6 @@ services:
     # build: 
     #   context: /srv/newsblur
     #   dockerfile: docker/newsblur_base_image.Dockerfile
-    user: "${CURRENT_UID}:${CURRENT_GID}"
     environment: 
       - DOCKERBUILD=True
       - RUNWITHMAKEBUILD=${RUNWITHMAKEBUILD?Use the `make` command instead of docker CLI}
@@ -35,7 +34,6 @@ services:
   newsblur_node:
     container_name: node
     image: newsblur/newsblur_node:latest
-    user: "${CURRENT_UID}:${CURRENT_GID}"
     environment:
       - NODE_ENV=docker
       - MONGODB_PORT=29019
@@ -55,7 +53,6 @@ services:
     container_name: imageproxy
     image: ghcr.io/willnorris/imageproxy:latest
     # image: yusukeito/imageproxy:v0.11.2 # Switch this with the willnorris/imageproxy above if you want arm64
-    user: "${CURRENT_UID}:${CURRENT_GID}"
     entrypoint: /app/imageproxy -addr 0.0.0.0:8088 -cache /tmp/imageproxy -verbose
     restart: unless-stopped
     ports:
@@ -84,20 +81,20 @@ services:
 
   db_postgres:
     container_name: db_postgres
-    image: postgres:13.1
+    image: postgres:13.9
     restart: unless-stopped
     environment:
       - POSTGRES_USER=newsblur
       - POSTGRES_PASSWORD=newsblur
-    # healthcheck:
-    #   test: ["CMD-SHELL", "pg_isready -U newsblur"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U local -d newsblur" ]
+      interval: 2s
+      timeout: 3s
+      retries: 5
     ports:
       - 5434:5432
     volumes:
-      - ./docker/volumes/postgres:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
 
   db_redis:
     container_name: db_redis
@@ -108,7 +105,7 @@ services:
     volumes:
       - ./docker/redis/redis.conf:/etc/redis/redis.conf
       - ./docker/redis/redis_server.conf:/usr/local/etc/redis/redis_replica.conf
-      - ./docker/volumes/redis:/data
+      - redisdata:/data
     command: redis-server /etc/redis/redis.conf --port 6579
 
   db_elasticsearch:
@@ -122,7 +119,7 @@ services:
       - 9200:9200
       - 9300:9300
     volumes:
-      - ./docker/volumes/elasticsearch:/elasticsearch/dat
+      - elasticsearchdata:/elasticsearch/data
       - ./config/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
 
   db_mongo:
@@ -133,12 +130,11 @@ services:
       - 29019:29019
     command: mongod --port 29019
     volumes:
-      - ./docker/volumes/db_mongo:/data/db
+      - mongodata:/data/db
 
   task_celery:
     container_name: task_celery
     image: newsblur/newsblur_python3
-    user: "${CURRENT_UID}:${CURRENT_GID}"
     command: "celery worker -A newsblur_web -B --loglevel=INFO"
     restart: unless-stopped
     volumes:
@@ -166,3 +162,9 @@ services:
     volumes:
       - ./docker/haproxy/haproxy.docker-compose.cfg:/usr/local/etc/haproxy/haproxy.cfg
       - ${PWD}:/srv/newsblur
+
+volumes:
+  pgdata:
+  redisdata:
+  mongodata:
+  elasticsearchdata:
