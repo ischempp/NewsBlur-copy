@@ -39,6 +39,7 @@ from mongoengine import connect
 from pymongo import monitoring
 from utils.mongo_command_monitor import MongoCommandLogger
 import boto3
+from neo4j import GraphDatabase
 
 # ===================
 # = Server Settings =
@@ -803,6 +804,16 @@ REDIS_FEED_READ_POOL       = redis.ConnectionPool(host=REDIS_SESSIONS['host'], p
 REDIS_FEED_SUB_POOL        = redis.ConnectionPool(host=REDIS_SESSIONS['host'], port=REDIS_PORT, db=2, decode_responses=True)
 REDIS_SESSION_POOL         = redis.ConnectionPool(host=REDIS_SESSIONS['host'], port=REDIS_PORT, db=5, decode_responses=True)
 REDIS_PUBSUB_POOL          = redis.ConnectionPool(host=REDIS_PUBSUB['host'], port=REDIS_PORT, db=0, decode_responses=True)
+
+# =========
+# = Neo4j =
+# =========
+
+NEO4J_URI = "neo4j://localhost:7687"
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD = "password"
+
+neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 # ==========
 # = Celery =

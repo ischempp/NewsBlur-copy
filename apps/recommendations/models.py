@@ -1,5 +1,6 @@
 import mongoengine as mongo
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import User
 from apps.rss_feeds.models import Feed
 from apps.reader.models import UserSubscription, UserSubscriptionFolders
@@ -70,3 +71,36 @@ class MFeedFolder(mongo.Document):
                     sub_folder_title = cls.feed_folder_parent(f_v, feed_id, f_k)
                     if sub_folder_title: 
                         return sub_folder_title
+
+class FeedGraph:
+
+    def add_subscription(self, tx, user_id, feed_id):
+        tx.run("MERGE (u:User {id: $user_id}) "
+            "MERGE (f:Feed {id: $feed_id}) "
+            "MERGE (u)-[:HAS]->(fo) "
+            "MERGE (fo)-[:CONTAINS]->(f)",
+            user_id=user_id, feed_id=feed_id, folder_name=folder_name)
+
+    def find_related_feeds(tx, user_id, folder_name, overlap_threshold):
+        result = tx.run("MATCH (u:User {id: $user_id})-[:SUBSCRIBES_TO]->(:Feed)<-[:SUBSCRIBES_TO]-(other:User)-[:SUBSCRIBES_TO]->(related:Feed) "
+                            "WHERE not((u)-[:SUBSCRIBES_TO]->(related)) "
+                            "WITH related.id as feed_id, count(other) as overlap "
+                            "WHERE overlap >= $overlap_threshold "
+                            "RETURN feed_id "
+                            "ORDER BY overlap DESC",
+                            user_id=user_id, overlap_threshold=overlap_threshold)
+            return [record["feed_id"] for record in result]
+
+    def add_all_subscriptions(self):
+        with settings.neo4j_driver.session() as session:
+            for sub in UserSubscription.objects.all().iterator():
+                session.write_transaction(add_subscription, sub,user_id, sub.feed_id)
+
+    def run_graph(self):
+        with settings.neo4j_driver.session() as session:
+            overlap_threshold = 1
+            for sub in UserSubscription.objects.all().iterator():
+                related_feeds = session.read_transaction(find_related_feeds, sub.user_id, overlap_threshold)
+                print(f"User {user_id} might be interested in feeds: {related_feeds}")
+
+

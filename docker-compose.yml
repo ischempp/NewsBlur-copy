@@ -143,6 +143,18 @@ services:
     command: mongod --port 29019
     volumes:
       - ./docker/volumes/db_mongo:/data/db
+  
+  db_neo4j:
+    image: neo4j:latest
+    container_name: db_neo4j
+    restart: unless-stopped
+    ports:
+      - 7474:7474
+      - 7687:7687
+    volumes:
+      - ./docker/volumes/neo4j:/data
+    environment:
+      - NEO4J_AUTH=neo4j/password
 
   task_celery:
     container_name: task_celery
